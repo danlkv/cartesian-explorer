@@ -26,7 +26,6 @@ class FunctoolsCache(CacheIFC):
         sentinel = None
         key = cache1._make_key(args, kwargs, typed=False)
         val = func.cache_get(key, sentinel)
-        print('lookup get', val)
         return (val is not sentinel)
 
     def clear(self, func):
