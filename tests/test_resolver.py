@@ -1,5 +1,5 @@
 from cartesian_explorer import Explorer
-from collections import namedtuple
+from dataclasses import dataclass
 import pytest
 
 def test_resolve_linear():
@@ -49,6 +49,11 @@ def test_resolve_complex():
     print('comlex with xmn', funcs_to_call)
     assert (funcs_to_call) == [y, ]
 
+@dataclass
+class Person:
+    name: str
+    surname: str
+    age: int
 
 def test_resolve_call():
     explorer = Explorer()
@@ -74,7 +79,6 @@ def test_resolve_call():
 
     @explorer.add_function(provides=('person', ), requires=('name','age','surname'))
     def make_person(name, surname, age):
-        Person = namedtuple('Person', ('name', 'surname', 'age'))
         return Person(name, surname, age)
 
 
@@ -90,3 +94,8 @@ def test_resolve_call():
 
     middle = explorer.get_variable('middlename', name='Martin')
     assert middle == 'Luther'
+
+    people = explorer.map_variable('person', name=['Martin', 'John'])
+    assert len(people) == 2
+    assert people[0].name == 'Martin'
+    assert people[0].age == 15

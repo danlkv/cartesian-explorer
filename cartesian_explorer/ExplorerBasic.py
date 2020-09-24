@@ -42,6 +42,7 @@ class ExplorerBasic:
     def map(self, func, processes=1, **param_space: Dict[str, iter]):
         # Uses apply_func
         param_iter = dict_product(**param_space)
+        print('param_space',param_space)
         result_shape = tuple(len(x) for x in param_space.values())
         if processes > 1 and self.Pool is not None:
             with self.Pool(processes=processes) as pool:
@@ -50,6 +51,7 @@ class ExplorerBasic:
                 )
         else:
             result = np.array(list(map(lambda x: func(**x), param_iter)))
+        print('result', result, result_shape)
         return result.reshape(result_shape)
 
     def map_no_call(self, func, processes=1, **param_space: Dict[str, iter]):
@@ -67,48 +69,52 @@ class ExplorerBasic:
 
     #---- Plotting
 
-    def plot2d(self, func, plt_func=plt.plot, plot_kwargs=dict(), **var_iter ):
-        assert len(var_iter) == 1, '2d plot supports only one input variable'
-
-        #-- Check input arg
+    def get_xy_iterargs(self, var_iter):
         len_x = None
-        x_label = None
-        x = []
-        for key in var_iter:
-            try:
-                len_x = len(var_iter[key])
-                x = list(var_iter[key])
-                x_label = key
-            except Exception:
-                var_iter[key] = (var_iter[key], )
-
-        data = self.map(func, **var_iter)
-        plt_func(x, data.reshape(len_x), **plot_kwargs)
-        plt.xlabel(x_label)
-
-    def plot3d(self, func, plt_func=plt.contourf, plot_kwargs=dict(), **var_iter ):
-        assert len(var_iter) == 2, '3d plot supports only two input variables'
-
-        #-- Check input arg
-        len_x = len_y = None
         x_label = y_label = None
         x = []
         y = []
         for key in var_iter:
             try:
                 if len_x is None:
+                    if isinstance(var_iter[key], str):
+                        raise ValueError("Won't iterate this string")
                     len_x = len(var_iter[key])
                     x = list(var_iter[key])
                     x_label = key
                 else:
-                    len_y = len(var_iter[key])
                     y = list(var_iter[key])
                     y_label = key
-
             except Exception:
                 var_iter[key] = (var_iter[key], )
 
+        return x, y, x_label, y_label
+
+    def plot2d(self, func, plt_func=plt.plot, plot_kwargs=dict(), **var_iter ):
+        p_len = len(var_iter)
+        assert p_len <= 2, '2d plot supports no more than 2 input variables'
+
+
+        #-- Check input arg
+        x, y, x_label, y_label  = self.get_xy_iterargs(var_iter)
+        data = self.map(func, **var_iter)
+
+        if y_label is None:
+            plt_func(x, data.reshape(len(x)), **plot_kwargs)
+        else:
+            for i, yval in enumerate(y):
+                plot_kwargs['label'] = str(yval)
+                plt_func(x, data.reshape(len(x), len(y))[i], **plot_kwargs)
+        plt.legend()
+        plt.xlabel(x_label)
+
+    def plot3d(self, func, plt_func=plt.contourf, plot_kwargs=dict(), **var_iter ):
+        assert len(var_iter) == 2, '3d plot supports only two input variables'
+
+        #-- Check input arg
+        x, y, x_label, y_label = self.get_xy_iterargs(var_iter)
+
         data = self.map(func, **var_iter).T
-        plt_func(x, y, data.reshape(len_y, len_x), **plot_kwargs)
+        plt_func(x, y, data.reshape(len(y), len(x)), **plot_kwargs)
         plt.xlabel(x_label)
         plt.ylabel(y_label)

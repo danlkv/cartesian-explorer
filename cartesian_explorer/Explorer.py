@@ -1,6 +1,7 @@
 from cartesian_explorer.ExplorerBasic import ExplorerBasic
 from typing import Union
 from functools import update_wrapper
+from itertools import repeat
 
 def limit_recurse(limit=10):
     def limit_wrapper(func):
@@ -109,3 +110,15 @@ class Explorer(ExplorerBasic):
     def get_variable(self, varname, **kwargs):
         return self.get_variables([varname], **kwargs)[0]
 
+    #------ Mappers
+    def map_variables(self, varnames, **kwargs):
+        return self.map(self.get_variables, varnames=[varnames], **kwargs)
+
+    def map_variables_no_call(self, varnames, **kwargs):
+        return self.map_no_call(self.get_variables, varnames=[varnames], **kwargs)
+
+    def map_variable(self, varname, **kwargs):
+        return self.map_variables([varname], **kwargs)[0]
+
+    def map_variable_no_call(self, varname, **kwargs):
+        return self.map_variables_no_call([varname], **kwargs)[0]
