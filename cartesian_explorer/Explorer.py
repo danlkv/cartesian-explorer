@@ -122,3 +122,14 @@ class Explorer(ExplorerBasic):
 
     def map_variable_no_call(self, varname, **kwargs):
         return self.map_variables_no_call([varname], **kwargs)[0]
+
+    #------ Plotting
+    def plot_variables2d(self, varnames: Union[str, iter], **kwargs):
+        if isinstance(varnames, str):
+            varnames = [varnames]
+        return self.plot2d(self.get_variables, varnames=[varnames], **kwargs)
+
+    def plot_variables3d(self, varnames: Union[str, iter], **kwargs):
+        if isinstance(varnames, str):
+            varnames = [varnames]
+        return self.plot3d(self.get_variables, varnames=[varnames], **kwargs)
