@@ -2,10 +2,14 @@ import numpy as np
 from multiprocessing import Pool
 from multiprocessing.dummy import Pool as ThreadPool
 from functools import update_wrapper
+from itertools import repeat
 from cartesian_explorer import caches
 from cartesian_explorer import dict_product
 
 from typing import Dict
+
+def apply_func(func, kwargs):
+    return func(**kwargs)
 
 class Explorer:
     def __init__(self, use_cache=True, parallel='thread'):
@@ -47,11 +51,14 @@ class Explorer:
 
     def map(self, func, processes=1, **param_space: Dict[str, iter]):
         param_iter = dict_product(**param_space)
+        result_shape = tuple(len(x) for x in param_space.values())
         if processes > 1 and self.Pool is not None:
             with self.Pool(processes=processes) as pool:
-                data = np.array(pool.map(lambda x: func(**x), param_iter))
+                result = np.array(pool.starmap(
+                    apply_func, zip(repeat(func), param_iter))
+                )
         else:
-            data = np.array(list(map(lambda x: func(**x), param_iter)))
-        return data
+            result = np.array(list(map(lambda x: func(**x), param_iter)))
+        return result.reshape(result_shape)
 
 

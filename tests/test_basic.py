@@ -19,3 +19,20 @@ def test_maps():
     data = explorer.map(my_function, x=range(5))
     print(data)
     assert np.allclose(data, np.arange(1,6))
+
+    def my_function(x, y):
+        return x+y
+    data = explorer.map(my_function, x=range(5), y=range(3))
+    print(data)
+    assert data.shape == (5, 3)
+    assert data[1, 2] == my_function(1, 2)
+    assert data[4, 2] == 4+2
+
+def my_function(x):
+    return x+1
+
+def test_mproc():
+    explorer = Explorer(parallel='process')
+    data = explorer.map(my_function, processes=2, x=range(5))
+    print(data)
+    assert np.allclose(data, np.arange(1,6))
