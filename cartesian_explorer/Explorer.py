@@ -50,6 +50,7 @@ class Explorer(ExplorerBasic):
     def _resolve_call(self, need, have, func_to_call=[]):
         have = set(have)
         vars_left = set(need) - set(have)
+        #print('resolving', need, 'have', have, 'left', vars_left)
         if len(vars_left)==0:
             return func_to_call
         else:
