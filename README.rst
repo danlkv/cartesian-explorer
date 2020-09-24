@@ -29,6 +29,7 @@ Works:
 - Built-in caching
 
 Will work:
+
 - Handy plotting utilities
 - Resolving dependencies between functions that require and provide variables
 
@@ -37,7 +38,8 @@ Usage
 
 Map
 
-..code-block:: python 
+.. code-block:: python 
+
     from cartesian_explorer import Explorer
 
     explorer = Explorer()
@@ -52,7 +54,8 @@ Map
 
 Cache
 
-..code-block:: python
+.. code-block:: python
+
     from cartesian_explorer import Explorer
     explorer = Explorer()
     mock = MagicMock()
@@ -61,3 +64,4 @@ Cache
     wrapped(a=1, b=2)
     wrapped(a=1, b=2)
     my_function.assert_called_once_with(a=1, b=2)
+
