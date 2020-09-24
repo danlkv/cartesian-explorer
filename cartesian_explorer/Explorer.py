@@ -1,10 +1,13 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from multiprocessing import Pool
 from multiprocessing.dummy import Pool as ThreadPool
 from functools import update_wrapper
 from itertools import repeat
+
 from cartesian_explorer import caches
 from cartesian_explorer import dict_product
+
 
 from typing import Dict
 
@@ -54,6 +57,7 @@ class Explorer:
     #---- Output
 
     def map(self, func, processes=1, **param_space: Dict[str, iter]):
+        # Uses apply_func
         param_iter = dict_product(**param_space)
         result_shape = tuple(len(x) for x in param_space.values())
         if processes > 1 and self.Pool is not None:
@@ -66,6 +70,7 @@ class Explorer:
         return result.reshape(result_shape)
 
     def map_no_call(self, func, processes=1, **param_space: Dict[str, iter]):
+        # Uses just_lookup 
         param_iter = dict_product(**param_space)
         result_shape = tuple(len(x) for x in param_space.values())
         if processes > 1 and self.Pool is not None:
@@ -76,3 +81,51 @@ class Explorer:
         else:
             result = np.array(list(map(lambda x: just_lookup(func, self.cache, x), param_iter)))
         return result.reshape(result_shape)
+
+    #---- Plotting
+
+    def plot2d(self, func, plt_func=plt.plot, plot_kwargs=dict(), **var_iter ):
+        assert len(var_iter) == 1, '2d plot supports only one input variable'
+
+        #-- Check input arg
+        len_x = None
+        x_label = None
+        x = []
+        for key in var_iter:
+            try:
+                len_x = len(var_iter[key])
+                x = list(var_iter[key])
+                x_label = key
+            except Exception:
+                var_iter[key] = (var_iter[key], )
+
+        data = self.map(func, **var_iter)
+        plt_func(x, data.reshape(len_x), **plot_kwargs)
+        plt.xlabel(x_label)
+
+    def plot3d(self, func, plt_func=plt.contourf, plot_kwargs=dict(), **var_iter ):
+        assert len(var_iter) == 2, '3d plot supports only two input variables'
+
+        #-- Check input arg
+        len_x = len_y = None
+        x_label = y_label = None
+        x = []
+        y = []
+        for key in var_iter:
+            try:
+                if len_x is None:
+                    len_x = len(var_iter[key])
+                    x = list(var_iter[key])
+                    x_label = key
+                else:
+                    len_y = len(var_iter[key])
+                    y = list(var_iter[key])
+                    y_label = key
+
+            except Exception:
+                var_iter[key] = (var_iter[key], )
+
+        data = self.map(func, **var_iter)
+        plt_func(x, y, data.reshape(len_x, len_y), **plot_kwargs)
+        plt.xlabel(x_label)
+        plt.ylabel(y_label)
