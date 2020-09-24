@@ -125,7 +125,7 @@ class Explorer:
             except Exception:
                 var_iter[key] = (var_iter[key], )
 
-        data = self.map(func, **var_iter)
-        plt_func(x, y, data.reshape(len_x, len_y), **plot_kwargs)
+        data = self.map(func, **var_iter).T
+        plt_func(x, y, data.reshape(len_y, len_x), **plot_kwargs)
         plt.xlabel(x_label)
         plt.ylabel(y_label)
