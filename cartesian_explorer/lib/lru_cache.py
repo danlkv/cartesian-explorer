@@ -204,6 +204,7 @@ def _lru_cache_wrapper(user_function, maxsize, typed, _CacheInfo):
             hits = misses = 0
             full = False
 
+    wrapper.cache_get = cache
     wrapper.cache_info = cache_info
     wrapper.cache_clear = cache_clear
     return wrapper
