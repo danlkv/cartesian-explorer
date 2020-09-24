@@ -10,10 +10,14 @@ from typing import Dict
 
 def apply_func(func, kwargs):
     return func(**kwargs)
+def just_lookup(func, cache, kwargs):
+    in_cache = cache.lookup(func, **kwargs)
+    if in_cache:
+        return func(**kwargs)
 
 class Explorer:
-    def __init__(self, use_cache=True, parallel='thread'):
-        self.cache = caches.FunctoolsCache() if use_cache else None
+    def __init__(self, cache=caches.FunctoolsCache(), parallel='thread'):
+        self.cache = cache if cache else None
         if parallel=='thread':
             self.Pool = ThreadPool
         elif parallel=='process':
@@ -61,4 +65,14 @@ class Explorer:
             result = np.array(list(map(lambda x: func(**x), param_iter)))
         return result.reshape(result_shape)
 
-
+    def map_no_call(self, func, processes=1, **param_space: Dict[str, iter]):
+        param_iter = dict_product(**param_space)
+        result_shape = tuple(len(x) for x in param_space.values())
+        if processes > 1 and self.Pool is not None:
+            with self.Pool(processes=processes) as pool:
+                result = np.array(pool.starmap(
+                    just_lookup, zip(repeat(func), repeat(self.cache), param_iter))
+                )
+        else:
+            result = np.array(list(map(lambda x: just_lookup(func, self.cache, x), param_iter)))
+        return result.reshape(result_shape)
