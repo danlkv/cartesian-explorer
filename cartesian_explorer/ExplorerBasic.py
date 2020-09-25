@@ -39,11 +39,11 @@ class ExplorerBasic:
 
     #---- Output
 
-    def map(self, func, processes=1, **param_space: Dict[str, iter]):
+    def map(self, func, processes=1, out_dim=None, **param_space: Dict[str, iter]):
         # Uses apply_func
         param_iter = dict_product(**param_space)
-        print('param_space',param_space)
         result_shape = tuple(len(x) for x in param_space.values())
+        result_shape = tuple(x for x in result_shape if x>1)
         if processes > 1 and self.Pool is not None:
             with self.Pool(processes=processes) as pool:
                 result = np.array(pool.starmap(
@@ -52,12 +52,16 @@ class ExplorerBasic:
         else:
             result = np.array(list(map(lambda x: func(**x), param_iter)))
         #print('result', result, result_shape)
+        if out_dim:
+            result_shape = out_dim, *result_shape
+            result = np.swapaxes(result, 0, -1)
         return result.reshape(result_shape)
 
-    def map_no_call(self, func, processes=1, **param_space: Dict[str, iter]):
+    def map_no_call(self, func, processes=1, out_dim=None, **param_space: Dict[str, iter]):
         # Uses just_lookup 
         param_iter = dict_product(**param_space)
         result_shape = tuple(len(x) for x in param_space.values())
+        result_shape = tuple(x for x in result_shape if x>1)
         if processes > 1 and self.Pool is not None:
             with self.Pool(processes=processes) as pool:
                 result = np.array(pool.starmap(
@@ -65,6 +69,9 @@ class ExplorerBasic:
                 )
         else:
             result = np.array(list(map(lambda x: just_lookup(func, self.cache, x), param_iter)))
+        if out_dim:
+            result_shape = out_dim, *result_shape
+            result = np.swapaxes(result, 0, -1)
         return result.reshape(result_shape)
 
     #---- Plotting
@@ -104,13 +111,14 @@ class ExplorerBasic:
         data = self.map(func, **var_iter)
 
         if y_label is None:
-            plt_func(x, data.reshape(len(x)), **plot_kwargs)
+            ret = plt_func(x, data.reshape(len(x)), **plot_kwargs)
         else:
             for i, yval in enumerate(y):
                 plot_kwargs['label'] = str(yval)
-                plt_func(x, data.reshape(len(x), len(y))[:, i], **plot_kwargs)
+                ret = plt_func(x, data.reshape(len(x), len(y))[:, i], **plot_kwargs)
         plt.legend()
         plt.xlabel(x_label)
+        return ret
 
     def plot3d(self, func, plt_func=plt.contourf, plot_kwargs=dict(), **var_iter ):
 
@@ -118,6 +126,8 @@ class ExplorerBasic:
         x, y, x_label, y_label = self.get_xy_iterargs(var_iter)
 
         data = self.map(func, **var_iter).T
-        plt_func(x, y, data.reshape(len(y), len(x)), **plot_kwargs)
+        ret = plt_func(x, y, data.reshape(len(y), len(x)), **plot_kwargs)
+        plt.colorbar(ret)
         plt.xlabel(x_label)
         plt.ylabel(y_label)
+        return ret

@@ -109,15 +109,45 @@ class Explorer(ExplorerBasic):
                     raise RuntimeWarning(f'Your function `{f.__name__}` returned {ret_len} values, but was registered to provide {this_provides}')
         return [current_blackboard[name] for name in varnames]
 
+    def get_variables_no_call(self, varnames, no_call=[], **kwargs):
+        funcs = self._resolve_call(need=varnames, have=list(kwargs.keys()))
+        current_blackboard = kwargs
+        for f in reversed(funcs):
+            required = self._function_requires[f]
+            # Apply function to blackboard
+            call_kwd = {k: current_blackboard[k] for k in required}
+            this_provides = self._function_provides[f]
+            in_cache = self.cache.lookup(f, **call_kwd)
+            if in_cache and f.__name__ in no_call:
+                retval = f(**call_kwd)
+            else:
+                retval = tuple([None]*len(this_provides))
+            # Unpack the response
+            if isinstance(retval, dict):
+                current_blackboard.update(retval)
+            else:
+                # Create dict to update current blackboard
+                if len(this_provides)>1 and isinstance(retval, tuple):
+                    ret_len = len(retval)
+                else:
+                    ret_len = 1
+                    retval = [retval]
+                current_blackboard.update(
+                    {varname: val for varname, val in zip(this_provides, retval)}
+                )
+                if not len(this_provides) == ret_len:
+                    raise RuntimeWarning(f'Your function `{f.__name__}` returned {ret_len} values, but was registered to provide {this_provides}')
+        return [current_blackboard[name] for name in varnames]
+
     def get_variable(self, varname, **kwargs):
         return self.get_variables([varname], **kwargs)[0]
 
     #------ Mappers
     def map_variables(self, varnames, **kwargs):
-        return self.map(self.get_variables, varnames=[varnames], **kwargs)
+        return self.map(self.get_variables, varnames=[varnames], out_dim=len(varnames), **kwargs)
 
     def map_variables_no_call(self, varnames, **kwargs):
-        return self.map_no_call(self.get_variables, varnames=[varnames], **kwargs)
+        return self.map_no_call(self.get_variables, varnames=[varnames], out_dim=len(varnames), **kwargs)
 
     def map_variable(self, varname, **kwargs):
         return self.map_variables([varname], **kwargs)[0]
@@ -137,4 +167,18 @@ class Explorer(ExplorerBasic):
         if isinstance(varnames, str):
             varnames = [varnames]
         r = self.plot3d(self.get_variables, varnames=[varnames], **kwargs)
+        return r
+
+    # lots of code duplication, but abstracting this would result in bad readability
+    def plot_variables2d_no_call(self, varnames: Union[str, iter], **kwargs):
+        if isinstance(varnames, str):
+            varnames = [varnames]
+        r = self.plot2d(self.get_variables_no_call, varnames=[varnames], **kwargs)
+        plt.ylabel(varnames[0])
+        return r
+
+    def plot_variables3d_no_call(self, varnames: Union[str, iter], **kwargs):
+        if isinstance(varnames, str):
+            varnames = [varnames]
+        r = self.plot3d(self.get_variables_no_call, varnames=[varnames], **kwargs)
         return r
