@@ -2,8 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from multiprocessing import Pool
 from multiprocessing.dummy import Pool as ThreadPool
-from functools import update_wrapper
+from functools import update_wrapper, reduce
 from itertools import repeat
+from tqdm.auto import tqdm
 
 from cartesian_explorer import caches
 from cartesian_explorer import dict_product
@@ -11,7 +12,8 @@ from cartesian_explorer import dict_product
 
 from typing import Dict
 
-def apply_func(func, kwargs):
+def apply_func(x):
+    func, kwargs = x
     return func(**kwargs)
 def just_lookup(func, cache, kwargs):
     in_cache = cache.lookup(func, **kwargs)
@@ -39,18 +41,23 @@ class ExplorerBasic:
 
     #---- Output
 
-    def map(self, func, processes=1, out_dim=None, **param_space: Dict[str, iter]):
+    def map(self, func, processes=1, out_dim=None, pbar=True,
+            **param_space: Dict[str, iter]):
         # Uses apply_func
         param_iter = dict_product(**param_space)
         result_shape = tuple(len(x) for x in param_space.values())
         result_shape = tuple(x for x in result_shape if x>1)
+        total_len = reduce(lambda x, y: x*y, result_shape, 1)
         if processes > 1 and self.Pool is not None:
             with self.Pool(processes=processes) as pool:
-                result = np.array(pool.starmap(
+                result = np.array(list(tqdm(pool.imap(
                     apply_func, zip(repeat(func), param_iter))
-                )
+                , total=total_len)))
         else:
-            result = np.array(list(map(lambda x: func(**x), param_iter)))
+            if pbar:
+                result = np.array(list(tqdm(map(lambda x: func(**x), param_iter))))
+            else:
+                result = np.array(list(tqdm(map(lambda x: func(**x), param_iter))))
         #print('result', result, result_shape)
         if out_dim:
             result_shape = out_dim, *result_shape
@@ -104,11 +111,12 @@ class ExplorerBasic:
         #print('selected iterargs', x_label, y_label)
         return x, y, x_label, y_label
 
-    def plot2d(self, func, plt_func=plt.plot, plot_kwargs=dict(), **var_iter ):
+    def plot2d(self, func, plt_func=plt.plot, plot_kwargs=dict(), processes=1,
+               **var_iter ):
 
         #-- Check input arg
         x, y, x_label, y_label  = self.get_xy_iterargs(var_iter)
-        data = self.map(func, **var_iter)
+        data = self.map(func, processes=processes, **var_iter)
 
         if y_label is None:
             ret = plt_func(x, data.reshape(len(x)), **plot_kwargs)
@@ -120,12 +128,13 @@ class ExplorerBasic:
         plt.xlabel(x_label)
         return ret
 
-    def plot3d(self, func, plt_func=plt.contourf, plot_kwargs=dict(), **var_iter ):
+    def plot3d(self, func, plt_func=plt.contourf, plot_kwargs=dict(), processes=1
+               , **var_iter ):
 
         #-- Check input arg
         x, y, x_label, y_label = self.get_xy_iterargs(var_iter)
 
-        data = self.map(func, **var_iter).T
+        data = self.map(func, processes=processes, **var_iter).T
         ret = plt_func(x, y, data.reshape(len(y), len(x)), **plot_kwargs)
         plt.colorbar(ret)
         plt.xlabel(x_label)
