@@ -2,6 +2,7 @@ from cartesian_explorer.ExplorerBasic import ExplorerBasic
 from typing import Union
 from functools import update_wrapper
 from itertools import repeat
+import matplotlib.pyplot as plt
 
 def limit_recurse(limit=10):
     def limit_wrapper(func):
@@ -128,9 +129,12 @@ class Explorer(ExplorerBasic):
     def plot_variables2d(self, varnames: Union[str, iter], **kwargs):
         if isinstance(varnames, str):
             varnames = [varnames]
-        return self.plot2d(self.get_variables, varnames=[varnames], **kwargs)
+        r = self.plot2d(self.get_variables, varnames=[varnames], **kwargs)
+        plt.ylabel(varnames[0])
+        return r
 
     def plot_variables3d(self, varnames: Union[str, iter], **kwargs):
         if isinstance(varnames, str):
             varnames = [varnames]
-        return self.plot3d(self.get_variables, varnames=[varnames], **kwargs)
+        r = self.plot3d(self.get_variables, varnames=[varnames], **kwargs)
+        return r
