@@ -27,9 +27,6 @@ Works:
 
 - Map over cartesian product of arguments: pass arrays of values for function argement
 - Built-in caching
-
-Will work:
-
 - Handy plotting utilities
 - Resolving dependencies between functions that require and provide variables
 
