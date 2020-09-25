@@ -14,18 +14,13 @@ Cartesian Explorer
         :alt: Documentation Status
 
 
-.. image:: https://pyup.io/repos/github/DaniloZZZ/cartesian-explorer/shield.svg
-     :target: https://pyup.io/repos/github/DaniloZZZ/cartesian-explorer/
-     :alt: Updates
-
-
 A handy tool to map functions over their domains.
 
 
 
 Works:
 
-- Map over cartesian product of arguments: pass arrays of values for function argement
+- Map over cartesian product of arguments: pass arrays of values for function argument
 - Built-in caching
 - Handy plotting utilities
 - Resolving dependencies between functions that require and provide variables
