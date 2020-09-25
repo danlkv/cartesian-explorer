@@ -69,6 +69,14 @@ class ExplorerBasic:
 
     #---- Plotting
 
+    def get_iterarg_params(self, value):
+        if isinstance(value, str):
+            raise ValueError("Won't iterate this string")
+        len_x = len(value)
+        if len_x == 1:
+            len_x = None
+        return list(value), len_x
+
     def get_xy_iterargs(self, var_iter):
         len_x = None
         x_label = y_label = None
@@ -77,20 +85,16 @@ class ExplorerBasic:
         for key in var_iter:
             try:
                 if len_x is None:
-                    if isinstance(var_iter[key], str):
-                        raise ValueError("Won't iterate this string")
-                    len_x = len(var_iter[key])
-                    if len_x == 1:
-                        len_x = None
-                        continue
-                    x = list(var_iter[key])
+                    x, len_x = self.get_iterarg_params(var_iter[key])
                     x_label = key
                 else:
+                    y, len_y = self.get_iterarg_params(var_iter[key])
                     y = list(var_iter[key])
                     y_label = key
             except Exception:
                 var_iter[key] = (var_iter[key], )
 
+        #print('selected iterargs', x_label, y_label)
         return x, y, x_label, y_label
 
     def plot2d(self, func, plt_func=plt.plot, plot_kwargs=dict(), **var_iter ):
