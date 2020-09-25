@@ -110,6 +110,7 @@ class Explorer(ExplorerBasic):
         return [current_blackboard[name] for name in varnames]
 
     def get_variables_no_call(self, varnames, no_call=[], **kwargs):
+        """ This method is experimental. Better use get_variables """
         funcs = self._resolve_call(need=varnames, have=list(kwargs.keys()))
         current_blackboard = kwargs
         for f in reversed(funcs):
