@@ -6,9 +6,10 @@ Cartesian Explorer
 .. image:: https://img.shields.io/pypi/v/cartesian-explorer.svg
         :target: https://pypi.python.org/pypi/cartesian-explorer
 
-.. image:: https://img.shields.io/travis/danlkv/cartesian-explorer.svg
-        :target: https://travis-ci.com/danlkv/cartesian-explorer
-
+.. image:: https://github.com/danlkv/cartesian-explorer/workflows/Test/badge.svg
+        :target: https://github.com/danlkv/cartesian-explorer/actions?query=workflow%3ATest
+        
+        
 .. image:: https://readthedocs.org/projects/cartesian-explorer/badge/?version=latest
         :target: https://cartesian-explorer.readthedocs.io/en/latest/?badge=latest
         :alt: Documentation Status
