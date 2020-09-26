@@ -49,9 +49,10 @@ def test_resolve_complex():
     assert (funcs_to_call) == (y, )
 
 class Person:
-    name: str
-    surname: str
-    age: int
+    def __init__(self, name, surname, age):
+        self.name = name
+        self.surname = surname
+        self.age = age
 
 def test_resolve_call():
     explorer = Explorer()
