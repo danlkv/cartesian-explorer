@@ -1,5 +1,4 @@
 from cartesian_explorer import Explorer
-from dataclasses import dataclass
 import pytest
 
 def test_resolve_linear():
@@ -49,7 +48,6 @@ def test_resolve_complex():
     print('comlex with xmn', funcs_to_call)
     assert (funcs_to_call) == (y, )
 
-@dataclass
 class Person:
     name: str
     surname: str
