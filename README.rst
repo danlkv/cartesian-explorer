@@ -6,8 +6,8 @@ Cartesian Explorer
 .. image:: https://img.shields.io/pypi/v/cartesian-explorer.svg
         :target: https://pypi.python.org/pypi/cartesian-explorer
 
-.. image:: https://img.shields.io/travis/DaniloZZZ/cartesian-explorer.svg
-        :target: https://travis-ci.com/DaniloZZZ/cartesian-explorer
+.. image:: https://img.shields.io/travis/danlkv/cartesian-explorer.svg
+        :target: https://travis-ci.com/danlkv/cartesian-explorer
 
 .. image:: https://readthedocs.org/projects/cartesian-explorer/badge/?version=latest
         :target: https://cartesian-explorer.readthedocs.io/en/latest/?badge=latest
