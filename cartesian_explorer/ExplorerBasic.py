@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from multiprocessing import Pool
 from multiprocessing.dummy import Pool as ThreadPool
-from functools import update_wrapper, reduce
+from functools import reduce
 from itertools import repeat
 from tqdm.auto import tqdm
 
@@ -23,17 +23,17 @@ def just_lookup(func, cache, kwargs):
 class ExplorerBasic:
     def __init__(self, cache_size=512, cache=caches.FunctoolsCache(), parallel='thread'):
         self.cache = cache if cache else None
-        self.cache_size=cache_size
-        if parallel=='thread':
+        self.cache_size = cache_size
+        if parallel == 'thread':
             self.Pool = ThreadPool
-        elif parallel=='process':
+        elif parallel == 'process':
             self.Pool = Pool
         else:
             self.Pool = None
 
+    # -- API
 
-    #-- API
-    #---- Input
+    # ---- Input
 
     def cache_function(self, func):
         if self.cache is not None:
@@ -44,20 +44,20 @@ class ExplorerBasic:
             func = self.cache.wrap(func, maxsize=cache_size)
         return func
 
-    #---- Output
+    # ---- Output
 
     def map(self, func, processes=1, out_dim=None, pbar=True,
             **param_space: Dict[str, iter]):
         # Uses apply_func
         param_iter = dict_product(**param_space)
         result_shape = tuple(len(x) for x in param_space.values())
-        result_shape = tuple(x for x in result_shape if x>1)
+        result_shape = tuple(x for x in result_shape if x > 1)
         total_len = reduce(lambda x, y: x*y, result_shape, 1)
         if processes > 1 and self.Pool is not None:
             with self.Pool(processes=processes) as pool:
                 result = np.array(list(tqdm(pool.imap(
                     apply_func, zip(repeat(func), param_iter))
-                , total=total_len)))
+                    , total=total_len)))
         else:
             if pbar:
                 result = np.array(list(tqdm(
@@ -66,30 +66,34 @@ class ExplorerBasic:
                 )))
             else:
                 result = np.array(list(map(lambda x: func(**x), param_iter)))
-        #print('result', result, result_shape)
+        # print('result', result, result_shape)
         if out_dim:
             result_shape = out_dim, *result_shape
             result = np.swapaxes(result, 0, -1)
         return result.reshape(result_shape)
 
-    def map_no_call(self, func, processes=1, out_dim=None, **param_space: Dict[str, iter]):
-        # Uses just_lookup 
+    def map_no_call(self, func, processes=1, out_dim=None,
+                    **param_space: Dict[str, iter]):
+        # Uses just_lookup
         param_iter = dict_product(**param_space)
         result_shape = tuple(len(x) for x in param_space.values())
-        result_shape = tuple(x for x in result_shape if x>1)
+        result_shape = tuple(x for x in result_shape if x > 1)
         if processes > 1 and self.Pool is not None:
             with self.Pool(processes=processes) as pool:
                 result = np.array(pool.starmap(
-                    just_lookup, zip(repeat(func), repeat(self.cache), param_iter))
+                    just_lookup,
+                    zip(repeat(func), repeat(self.cache), param_iter))
                 )
         else:
-            result = np.array(list(map(lambda x: just_lookup(func, self.cache, x), param_iter)))
+            result = np.array(list(map(
+                lambda x: just_lookup(func, self.cache, x),
+                param_iter)))
         if out_dim:
             result_shape = out_dim, *result_shape
             result = np.swapaxes(result, 0, -1)
         return result.reshape(result_shape)
 
-    #---- Plotting
+    # ---- Plotting
 
     def get_iterarg_params(self, value):
         if isinstance(value, str):
@@ -106,10 +110,11 @@ class ExplorerBasic:
         Parameters:
             uservars : dictionary of {key: Union[value, list[value]]}
 
-        Returns: filtered dictionary with good format of value {key: list[value]}
+        Returns:
+            filtered dictionary with good format of value {key: list[value]}
         """
         len_x = None
-        x_label = y_label = None
+        x_label = None
         var_specs = []
 
         uservars_corrected = {}
@@ -124,19 +129,20 @@ class ExplorerBasic:
             except (LookupError, ValueError):
                 uservars_corrected[key] = (uservars[key], )
 
-        #print('selected iterargs', var_specs)
+        # print('selected iterargs', var_specs)
         return dict(var_specs), uservars_corrected
 
     def _iterate_subplots(self, iterargs, subplot_var_key, data):
         if subplot_var_key is not None:
             subplots = iterargs[subplot_var_key]
-            f, axs = plt.subplots(1, len(subplots), figsize=(len(subplots)*4, 3), dpi=100)
+            f, axs = plt.subplots(1, len(subplots),
+                                  figsize=(len(subplots)*4, 3), dpi=100)
             data = data.reshape(len(subplots), -1)
         else:
             subplots = [None]
             f = plt.figure(dpi=100)
             axs = [plt.gca()]
-            data = data[np.newaxis,:]
+            data = data[np.newaxis, :]
         for i, (ax, subplot_val) in enumerate(zip(axs, subplots)):
             if subplot_val is not None:
                 ax.set_title(f'{subplot_var_key} = {subplot_val}')
@@ -144,8 +150,7 @@ class ExplorerBasic:
 
 
     def plot2d(self, func, plot_func=plt.plot, plot_kwargs=dict(), processes=1,
-               **uservars ):
-
+               **uservars):
 
         # -- Check input arg
         iterargs, uservars_corrected = self.get_iterargs(uservars)
