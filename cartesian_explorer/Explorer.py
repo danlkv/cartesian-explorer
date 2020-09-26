@@ -2,6 +2,7 @@ from cartesian_explorer.ExplorerBasic import ExplorerBasic
 from typing import Union
 from functools import update_wrapper
 from itertools import repeat
+from cartesian_explorer.lib.lru_cache import lru_cache
 import matplotlib.pyplot as plt
 
 def limit_recurse(limit=10):
@@ -47,11 +48,12 @@ class Explorer(ExplorerBasic):
         #print('fu', funcs_to_call)
         return tuple(set(funcs_to_call)), tuple(set(next_requires))
 
+    @lru_cache
     @limit_recurse(limit=10)
-    def _resolve_call(self, need, have, func_to_call=[]):
+    def _resolve_call(self, need, have, func_to_call=tuple()):
+        #print('resolving', need, 'have', have)
         have = set(have)
         vars_left = set(need) - set(have)
-        #print('resolving', need, 'have', have, 'left', vars_left)
         if len(vars_left)==0:
             return func_to_call
         else:
@@ -63,7 +65,7 @@ class Explorer(ExplorerBasic):
                 raise ValueError(f'Failed to resolve: no providers for {vars_left}')
             func_to_call = list(func_to_call)  + list(next_funcs)
             have_vars = tuple(set(vars_left) and set(have))
-            return self._resolve_call(next_requires, have_vars, func_to_call)
+            return self._resolve_call(next_requires, have_vars, tuple(func_to_call))
 
     #-- API
     #---- Input
@@ -84,7 +86,7 @@ class Explorer(ExplorerBasic):
     #---- Output
 
     def get_variables(self, varnames, **kwargs):
-        funcs = self._resolve_call(need=varnames, have=list(kwargs.keys()))
+        funcs = self._resolve_call(need=tuple(varnames), have=tuple(list(kwargs.keys())))
         current_blackboard = kwargs
         for f in reversed(funcs):
             required = self._function_requires[f]
@@ -159,23 +161,25 @@ class Explorer(ExplorerBasic):
     #------ Plotting
     def plot_variables2d(self, varnames: Union[str, iter], **kwargs):
         if isinstance(varnames, str):
-            varnames = [varnames]
-        r = self.plot2d(self.get_variables, varnames=[varnames], **kwargs)
-        plt.ylabel(varnames[0])
-        return r
+            varnames = (varnames, )
+        fig = self.plot2d(self.get_variable, varname=varnames, **kwargs)
+        for ax, name in zip(fig.axes, varnames):
+            ax.set_ylabel(name)
+        plt.tight_layout()
+        return fig
 
     def plot_variables3d(self, varnames: Union[str, iter], **kwargs):
         if isinstance(varnames, str):
-            varnames = [varnames]
-        r = self.plot3d(self.get_variables, varnames=[varnames], **kwargs)
-        return r
+            varnames = (varnames, )
+        fig = self.plot3d(self.get_variable, varname=varnames, **kwargs)
+        return fig
 
     # lots of code duplication, but abstracting this would result in bad readability
     def plot_variables2d_no_call(self, varnames: Union[str, iter], **kwargs):
         if isinstance(varnames, str):
             varnames = [varnames]
-        r = self.plot2d(self.get_variables_no_call, varnames=[varnames], **kwargs)
         plt.ylabel(varnames[0])
+        r = self.plot2d(self.get_variables_no_call, varnames=[varnames], **kwargs)
         return r
 
     def plot_variables3d_no_call(self, varnames: Union[str, iter], **kwargs):

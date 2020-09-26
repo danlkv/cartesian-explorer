@@ -21,8 +21,9 @@ def just_lookup(func, cache, kwargs):
         return func(**kwargs)
 
 class ExplorerBasic:
-    def __init__(self, cache=caches.FunctoolsCache(), parallel='thread'):
+    def __init__(self, cache_size=512, cache=caches.FunctoolsCache(), parallel='thread'):
         self.cache = cache if cache else None
+        self.cache_size=cache_size
         if parallel=='thread':
             self.Pool = ThreadPool
         elif parallel=='process':
@@ -36,7 +37,11 @@ class ExplorerBasic:
 
     def cache_function(self, func):
         if self.cache is not None:
-            func = self.cache.wrap(func)
+            if hasattr(self, 'cache_size'):
+                cache_size = self.cache_size
+            else:
+                cache_size = 512
+            func = self.cache.wrap(func, maxsize=cache_size)
         return func
 
     #---- Output
@@ -55,9 +60,12 @@ class ExplorerBasic:
                 , total=total_len)))
         else:
             if pbar:
-                result = np.array(list(tqdm(map(lambda x: func(**x), param_iter))))
+                result = np.array(list(tqdm(
+                    map(lambda x: func(**x), param_iter)
+                    , total=total_len
+                )))
             else:
-                result = np.array(list(tqdm(map(lambda x: func(**x), param_iter))))
+                result = np.array(list(map(lambda x: func(**x), param_iter)))
         #print('result', result, result_shape)
         if out_dim:
             result_shape = out_dim, *result_shape
@@ -86,57 +94,132 @@ class ExplorerBasic:
     def get_iterarg_params(self, value):
         if isinstance(value, str):
             raise ValueError("Won't iterate this string")
-        len_x = len(value)
-        if len_x == 1:
-            len_x = None
-        return list(value), len_x
+        return list(value), len(value)
 
-    def get_xy_iterargs(self, var_iter):
+    def get_iterargs(self, uservars):
+        """
+        1. Take a dictionary of user-provided arguments
+        and determine which arguments should we iterate over.
+
+        2. Convert single-value arguments to sequences for mapping
+
+        Parameters:
+            uservars : dictionary of {key: Union[value, list[value]]}
+
+        Returns: filtered dictionary with good format of value {key: list[value]}
+        """
         len_x = None
         x_label = y_label = None
-        x = []
-        y = []
-        for key in var_iter:
+        var_specs = []
+
+        uservars_corrected = {}
+        for key in uservars:
             try:
-                if len_x is None:
-                    x, len_x = self.get_iterarg_params(var_iter[key])
-                    x_label = key
-                else:
-                    y, len_y = self.get_iterarg_params(var_iter[key])
-                    y = list(var_iter[key])
-                    y_label = key
-            except Exception:
-                var_iter[key] = (var_iter[key], )
+                x, len_x = self.get_iterarg_params(uservars[key])
+                x_label = key
+                uservars_corrected[key] = uservars[key]
+                if len_x == 1:
+                    continue
+                var_specs.append((x_label, x))
+            except (LookupError, ValueError):
+                uservars_corrected[key] = (uservars[key], )
 
-        #print('selected iterargs', x_label, y_label)
-        return x, y, x_label, y_label
+        #print('selected iterargs', var_specs)
+        return dict(var_specs), uservars_corrected
 
-    def plot2d(self, func, plt_func=plt.plot, plot_kwargs=dict(), processes=1,
-               **var_iter ):
-
-        #-- Check input arg
-        x, y, x_label, y_label  = self.get_xy_iterargs(var_iter)
-        data = self.map(func, processes=processes, **var_iter)
-
-        if y_label is None:
-            ret = plt_func(x, data.reshape(len(x)), **plot_kwargs)
+    def _iterate_subplots(self, iterargs, subplot_var_key, data):
+        if subplot_var_key is not None:
+            subplots = iterargs[subplot_var_key]
+            f, axs = plt.subplots(1, len(subplots), figsize=(len(subplots)*4, 3), dpi=100)
+            data = data.reshape(len(subplots), -1)
         else:
-            for i, yval in enumerate(y):
-                plot_kwargs['label'] = str(yval)
-                ret = plt_func(x, data.reshape(len(x), len(y))[:, i], **plot_kwargs)
-        plt.legend()
-        plt.xlabel(x_label)
-        return ret
+            subplots = [None]
+            f = plt.figure(dpi=100)
+            axs = [plt.gca()]
+            data = data[np.newaxis,:]
+        for i, (ax, subplot_val) in enumerate(zip(axs, subplots)):
+            if subplot_val is not None:
+                ax.set_title(f'{subplot_var_key} = {subplot_val}')
+            yield f, ax, data[i]
 
-    def plot3d(self, func, plt_func=plt.contourf, plot_kwargs=dict(), processes=1
-               , **var_iter ):
+
+    def plot2d(self, func, plot_func=plt.plot, plot_kwargs=dict(), processes=1,
+               **uservars ):
+
+
+        # -- Check input arg
+        iterargs, uservars_corrected = self.get_iterargs(uservars)
+        #print('iterargs', iterargs)
+        plot_levels = [
+            'subplots'  # Goes to third to last iterarg if exists
+            ,'lines' # Goes to second to last iterarg, if exists
+            ,'x-axis' # Goes to last iterarg
+        ]
+        plot_level_var_keys = dict(zip(
+            reversed(plot_levels),
+            reversed(iterargs.keys())
+        ))
+        #print('plot level vars', plot_level_var_keys)
+
+        data = self.map(func, processes=processes, **uservars_corrected)
+
+        # -- Subplots preparation
+        subplot_var_key = plot_level_var_keys.get('subplots')
+        for f, ax, data in self._iterate_subplots(iterargs, subplot_var_key, data):
+            plt.sca(ax)
+        # --
+
+
+            x_var_key = plot_level_var_keys.get('x-axis')
+            x = iterargs[x_var_key]
+
+            # -- Lines preparation
+            lines_var_key = plot_level_var_keys.get('lines')
+            if lines_var_key is not None:
+                lines = iterargs[lines_var_key]
+            else:
+                lines = [None]
+
+            for i, lineval in enumerate(lines):
+                data = data.reshape(len(lines), len(x))
+                if lineval is not None:
+                    plot_kwargs['label'] = str(lineval)
+            # --
+                plot_func(x, data[i], **plot_kwargs)
+
+            plt.legend()
+            plt.xlabel(x_var_key)
+        return f
+
+    def plot3d(self, func, plot_func=plt.contourf, plot_kwargs=dict(), processes=1
+               , **uservars ):
 
         #-- Check input arg
-        x, y, x_label, y_label = self.get_xy_iterargs(var_iter)
+        iterargs, uservars_corrected = self.get_iterargs(uservars)
+        plot_levels = [
+            'subplots'  # Goes to third to last iterarg if exists
+            ,'y' # Goes to second to last iterarg, if exists
+            ,'x' # Goes to last iterarg
+        ]
+        plot_level_var_keys = dict(zip(
+            reversed(plot_levels),
+            reversed(iterargs.keys())
+        ))
+        #print('plot level vars', plot_level_var_keys)
+        # --
 
-        data = self.map(func, processes=processes, **var_iter).T
-        ret = plt_func(x, y, data.reshape(len(y), len(x)), **plot_kwargs)
-        plt.colorbar(ret)
-        plt.xlabel(x_label)
-        plt.ylabel(y_label)
-        return ret
+        data = self.map(func, processes=processes, **uservars_corrected)
+
+        # -- Subplots preparation
+        subplot_var_key = plot_level_var_keys.get('subplots')
+        for f, ax, data in self._iterate_subplots(iterargs, subplot_var_key, data):
+            plt.sca(ax)
+        # --
+            x_label, y_label = plot_level_var_keys['x'], plot_level_var_keys['y']
+            x, y = iterargs[x_label], iterargs[y_label]
+
+            ret = plot_func(x, y, data.reshape(len(y), len(x)), **plot_kwargs)
+            plt.colorbar(ret)
+            plt.xlabel(x_label)
+            plt.ylabel(y_label)
+        return f
