@@ -162,7 +162,7 @@ class ExplorerBasic:
         ]
         plot_level_var_keys = dict(zip(
             reversed(plot_levels),
-            reversed(iterargs.keys())
+            reversed(tuple(iterargs.keys()))
         ))
         #print('plot level vars', plot_level_var_keys)
 
@@ -208,7 +208,7 @@ class ExplorerBasic:
         ]
         plot_level_var_keys = dict(zip(
             reversed(plot_levels),
-            reversed(iterargs.keys())
+            reversed(tuple(iterargs.keys()))
         ))
         #print('plot level vars', plot_level_var_keys)
         # --
