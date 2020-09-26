@@ -17,11 +17,11 @@ def test_resolve_linear():
     def k(z):
         pass
 
-    funcs_to_call = explorer._resolve_call(need=['k'], have=['x'])
+    funcs_to_call = explorer._resolve_call(need=('k',), have=('x',))
     print('linear when have x', funcs_to_call)
     assert len(funcs_to_call) == 3
 
-    funcs_to_call = explorer._resolve_call(need=['k'], have=['y'])
+    funcs_to_call = explorer._resolve_call(need=('k',), have=('y',))
     print('linear when have y', funcs_to_call)
     assert len(funcs_to_call) == 2
 
@@ -39,15 +39,15 @@ def test_resolve_complex():
 
 
     with pytest.raises(RuntimeError):
-        funcs_to_call, all_requires = explorer._resolve_call(need=['y'], have=['a'])
+        funcs_to_call, all_requires = explorer._resolve_call(need=('y',), have=('a',))
 
-    funcs_to_call = explorer._resolve_call(need=['y'], have=['a', 'm', 'n'])
+    funcs_to_call = explorer._resolve_call(need=('y',), have=('a', 'm', 'n'))
     print('comlex with amn', funcs_to_call)
-    assert funcs_to_call == [y, x]
+    assert funcs_to_call == (y, x)
 
-    funcs_to_call = explorer._resolve_call(need=['y'], have=['x', 'm', 'n'])
+    funcs_to_call = explorer._resolve_call(need=('y',), have=('x', 'm', 'n'))
     print('comlex with xmn', funcs_to_call)
-    assert (funcs_to_call) == [y, ]
+    assert (funcs_to_call) == (y, )
 
 @dataclass
 class Person:
