@@ -98,3 +98,4 @@ def test_resolve_call():
     assert len(people) == 2
     assert people[0].name == 'Martin'
     assert people[0].age == 15
+

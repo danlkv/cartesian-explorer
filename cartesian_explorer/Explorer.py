@@ -1,8 +1,9 @@
 from cartesian_explorer.ExplorerBasic import ExplorerBasic
 from typing import Union
 from functools import update_wrapper
-from itertools import repeat
 from cartesian_explorer.lib.lru_cache import lru_cache
+from cartesian_explorer.lib.dep_graph import dep_graph, draw_dependency_graph
+from cartesian_explorer.lib.argument_inspect import get_argnames
 import matplotlib.pyplot as plt
 
 def limit_recurse(limit=10):
@@ -82,7 +83,7 @@ class Explorer(ExplorerBasic):
     #-- API
     #---- Input
 
-    def add_function(self, provides: Union[str, tuple] , requires=tuple()):
+    def add_function(self, provides: Union[str, tuple] , requires=tuple(), cache=True):
         if isinstance(provides, str):
             provides = [provides]
 
@@ -90,12 +91,33 @@ class Explorer(ExplorerBasic):
             requires = [requires]
 
         def func_wrapper(user_function):
-            func = self.cache_function(user_function)
+            if cache:
+                func = self.cache_function(user_function)
+            else:
+                func = user_function
             self._register_provider(func, provides, requires)
             return func
         return func_wrapper
 
+    def provider(self, user_function=None, *args, cache=True):
+        if user_function is not None:
+            return self.provider(cache=cache)(user_function)
+        else:
+            def func_wrapper(user_function):
+                provides = user_function.__name__
+                requires = tuple(get_argnames(user_function))
+                print('req', requires)
+                return self.add_function(provides, requires, cache)(user_function)
+            return func_wrapper
+
     #---- Output
+    def dependency_graph(self):
+        return dep_graph(self._function_requires, self._function_provides)
+
+    def draw_dependency_graph(self, figsize=(8, 5), dpi=100, **kwargs):
+        f = plt.figure(figsize=figsize, dpi=dpi)
+        draw_dependency_graph(self.dependency_graph(), **kwargs)
+        return f
 
     def get_variables(self, varnames, **kwargs):
         funcs = self._resolve_call(need=tuple(varnames), have=tuple(list(kwargs.keys())))
