@@ -8,6 +8,7 @@ from tqdm.auto import tqdm
 
 from cartesian_explorer import caches
 from cartesian_explorer import dict_product
+from cartesian_explorer import parallels
 
 
 from typing import Dict
@@ -21,15 +22,22 @@ def just_lookup(func, cache, kwargs):
         return func(**kwargs)
 
 class ExplorerBasic:
-    def __init__(self, cache_size=512, cache=caches.FunctoolsCache(), parallel='thread'):
+    def __init__(self, cache_size=512, parallel='thread'
+                 , cache=caches.FunctoolsCache()
+                ):
         self.cache = cache if cache else None
         self.cache_size = cache_size
-        if parallel == 'thread':
-            self.Pool = ThreadPool
-        elif parallel == 'process':
-            self.Pool = Pool
+        self.parallel_class = None
+        self.parallel = None
+        if isinstance(parallel, str):
+            if parallel == 'thread':
+                self.parallel_class = parallels.Thread
+            elif parallel == 'process':
+                self.parallel_class = parallels.Multiprocess
+            elif parallel == 'joblib':
+                self.parallel_class = parallels.JobLib
         else:
-            self.Pool = None
+            self.parallel = parallel
 
     # -- API
 
@@ -52,12 +60,13 @@ class ExplorerBasic:
         param_iter = dict_product(**param_space)
         result_shape = tuple(len(x) for x in param_space.values())
         result_shape = tuple(x for x in result_shape if x > 1)
-        total_len = reduce(lambda x, y: x*y, result_shape, 1)
-        if processes > 1 and self.Pool is not None:
-            with self.Pool(processes=processes) as pool:
-                result = np.array(list(tqdm(pool.imap(
-                    apply_func, zip(repeat(func), param_iter))
-                    , total=total_len)))
+
+        total_len = reduce(np.multiply, result_shape, 1)
+        if (processes > 1 and self.parallel_class is not None) or self.parallel:
+            parallel = self.parallel or self.parallel_class(processes=processes)
+            result = np.array(
+                parallel.starstarmap(func, param_iter)
+            )
         else:
             if pbar:
                 result = np.array(list(tqdm(
@@ -78,9 +87,9 @@ class ExplorerBasic:
         param_iter = dict_product(**param_space)
         result_shape = tuple(len(x) for x in param_space.values())
         result_shape = tuple(x for x in result_shape if x > 1)
-        if processes > 1 and self.Pool is not None:
-            with self.Pool(processes=processes) as pool:
-                result = np.array(pool.starmap(
+        if (processes > 1 and self.parallel_class is not None) or self.parallel:
+            parallel = self.parallel or self.parallel_class(processes=processes)
+            result = np.array(parallel.starmap(
                     just_lookup,
                     zip(repeat(func), repeat(self.cache), param_iter))
                 )

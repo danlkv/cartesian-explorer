@@ -1,7 +1,12 @@
 from cartesian_explorer.lib import lru_cache as cache1
 from cartesian_explorer.lib import lru_cache_mproc as cache2
 
+import joblib
+
 class CacheIFC:
+    def __call__(self, func):
+        return self.wrap(func)
+
     def wrap(self, func, **kwargs) -> callable:
         raise NotImplementedError
 
@@ -44,3 +49,25 @@ class FunctoolsCache_Mproc(FunctoolsCache):
         val = func.cache_get(key, sentinel)
         print('lookup get', val)
         return (val is not sentinel)
+
+class JobLibCache(CacheIFC):
+    def __init__(self, cachedir, verbose=0):
+        self.memory = joblib.Memory(cachedir, verbose=verbose)
+
+    def wrap(self, func, **kwargs) -> callable:
+        return self.memory.cache(func)
+
+    def call(self, func, *args, **kwargs):
+        return func(*args, **kwargs)
+
+    def lookup(self, func, *args, **kwargs):
+        """
+        They didn't merge it yet, but hope this works
+
+https://github.com/joblib/joblib/pull/820/files#diff-c66af844ce2989eb95b416d643de531d
+        """
+        func_id, args_id = func._get_output_identifiers(*args, **kwargs)
+        return func.store_backend.contains_item((func_id, args_id))
+
+    def clear(self, func):
+        func.clear()
