@@ -33,18 +33,24 @@ class Explorer(ExplorerBasic):
             self._variable_providers[var] = func
         self._function_provides[func] = list(provides)
         self._function_requires[func] = list(requires)
+        self._resolve_call.cache_clear()
 
     def _resolve_1(self, requires):
         funcs_to_call = []
+        next_requires = []
         for var in requires:
             try:
                 var_provider = self._variable_providers[var]
+                this_requires = self._function_requires[var_provider]
+                if var in this_requires:
+                    raise ValueError(f'Failed to resolve: depth-1 circular dependency of {var} in {var_provider}')
+                next_requires += this_requires
+
             except KeyError:
                 continue
 
             funcs_to_call.append(var_provider)
 
-        next_requires = sum([self._function_requires[func] for func in funcs_to_call], [])
         #print('fu', funcs_to_call)
         return tuple(set(funcs_to_call)), tuple(set(next_requires))
 
@@ -60,7 +66,13 @@ class Explorer(ExplorerBasic):
             next_funcs, next_requires = self._resolve_1(vars_left)
             #print('next', next_funcs, next_requires)
             if any(x in vars_left for x in next_requires):
-                raise ValueError('Failed to resolve: depth-1 circular dependency')
+                # could be not only in case of circular dependency :
+                #        .->2-\
+                #      1/----->3
+                # 3 needs 2 and 1; 2 needs 1
+
+                #raise ValueError(f'Failed to resolve: depth-1 circular dependency in {vars_left}')
+                pass
             if len(next_funcs) == 0:
                 raise ValueError(f'Failed to resolve: no providers for {vars_left}')
             func_to_call = list(func_to_call)  + list(next_funcs)
