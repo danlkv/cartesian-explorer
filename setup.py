@@ -2,7 +2,7 @@
 
 """The setup script."""
 
-from setuptools import setup, find_packages
+from setuptools import setup, PEP420PackageFinder
 
 with open('README.rst') as readme_file:
     readme = readme_file.read()
@@ -42,11 +42,11 @@ setup(
     include_package_data=True,
     keywords='cartesian_explorer',
     name='cartesian_explorer',
-    packages=find_packages(include=['cartesian_explorer', 'cartesian_explorer.*']),
+    packages=PEP420PackageFinder.find('cartesian_explorer'),
     setup_requires=setup_requirements,
     test_suite='tests',
     tests_require=test_requirements,
     url='https://github.com/danlkv/cartesian-explorer',
-    version='0.1.3',
+    version='0.1.4',
     zip_safe=False,
 )

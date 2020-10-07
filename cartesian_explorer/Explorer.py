@@ -106,7 +106,7 @@ class Explorer(ExplorerBasic):
             def func_wrapper(user_function):
                 provides = user_function.__name__
                 requires = tuple(get_argnames(user_function))
-                print('req', requires)
+                #print('provider requires', requires)
                 return self.add_function(provides, requires, cache)(user_function)
             return func_wrapper
 
