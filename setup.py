@@ -42,11 +42,11 @@ setup(
     include_package_data=True,
     keywords='cartesian_explorer',
     name='cartesian_explorer',
-    packages=['cartesian_explorer.'+x for x in find_namespace_packages('cartesian_explorer')], # This is horrible, how come there is no obvious simple solution for PEP-compliant packages?
+    packages=['cartesian_explorer.'+x for x in find_namespace_packages('cartesian_explorer')] + ['cartesian_explorer'], # This is horrible, how come there is no obvious simple solution for PEP-compliant packages?
     setup_requires=setup_requirements,
     test_suite='tests',
     tests_require=test_requirements,
     url='https://github.com/danlkv/cartesian-explorer',
-    version='0.1.4',
+    version='0.1.5',
     zip_safe=False,
 )
