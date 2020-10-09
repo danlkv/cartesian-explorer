@@ -7,7 +7,6 @@ def _maybe_unwrap(func):
         return func
 
 def _defaults_len(spec):
-    print(spec, spec.defaults)
     try:
         return len(spec.defaults)
     except (AttributeError, TypeError):
