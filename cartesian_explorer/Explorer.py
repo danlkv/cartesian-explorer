@@ -126,7 +126,7 @@ class Explorer(ExplorerBasic):
         call_kwd = {k: current_blackboard[k] for k in required}
         # -- pass optional parameters
         optional = get_optional_argnames(f)
-        print(f'{optional=} {current_blackboard=}')
+        #print(f'{optional=} {current_blackboard=}')
         if len(optional):
             for o_ in optional:
                 try:
