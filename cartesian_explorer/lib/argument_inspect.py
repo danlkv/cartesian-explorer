@@ -1,5 +1,22 @@
 import inspect
 
-def get_argnames(func):
-    spec = inspect.getfullargspec(func)
-    return spec.args + spec.kwonlyargs
+def _maybe_unwrap(func):
+    if hasattr(func, '__wrapped__'):
+        return func.__wrapped__
+    else:
+        return func
+
+def _defaults_len(spec):
+    print(spec, spec.defaults)
+    try:
+        return len(spec.defaults)
+    except (AttributeError, TypeError):
+        return 0
+
+def get_required_argnames(func):
+    spec = inspect.getfullargspec(_maybe_unwrap(func))
+    return spec.args[:-_defaults_len(spec)]
+
+def get_optional_argnames(func):
+    spec = inspect.getfullargspec(_maybe_unwrap(func))
+    return spec.args[-_defaults_len(spec):] + spec.kwonlyargs

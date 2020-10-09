@@ -99,3 +99,18 @@ def test_resolve_call():
     assert people[0].name == 'Martin'
     assert people[0].age == 15
 
+def test_provider_and_opts():
+    explorer = Explorer()
+
+    # Simple call
+
+    @explorer.provider
+    def sum(x, y=12):
+        return x+y
+
+    z = explorer.get_variable('sum', x=10)
+    assert z == 10+12
+    z = explorer.get_variable('sum', x=10, y=8)
+    assert z == 10+8
+
+

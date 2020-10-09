@@ -3,7 +3,7 @@ from typing import Union
 from functools import update_wrapper
 from cartesian_explorer.lib.lru_cache import lru_cache
 from cartesian_explorer.lib.dep_graph import dep_graph, draw_dependency_graph
-from cartesian_explorer.lib.argument_inspect import get_argnames
+from cartesian_explorer.lib.argument_inspect import get_required_argnames, get_optional_argnames
 import matplotlib.pyplot as plt
 
 def limit_recurse(limit=10):
@@ -71,9 +71,9 @@ class Explorer(ExplorerBasic):
                 #        .->2-\
                 #      1/----->3
                 # 3 needs 2 and 1; 2 needs 1
-
                 #raise ValueError(f'Failed to resolve: depth-1 circular dependency in {vars_left}')
                 pass
+
             if len(next_funcs) == 0:
                 raise ValueError(f'Failed to resolve: no providers for {vars_left}')
             func_to_call = list(func_to_call)  + list(next_funcs)
@@ -95,6 +95,7 @@ class Explorer(ExplorerBasic):
                 func = self.cache_function(user_function)
             else:
                 func = user_function
+            # caching must preserve the signature
             self._register_provider(func, provides, requires)
             return func
         return func_wrapper
@@ -105,7 +106,7 @@ class Explorer(ExplorerBasic):
         else:
             def func_wrapper(user_function):
                 provides = user_function.__name__
-                requires = tuple(get_argnames(user_function))
+                requires = tuple(get_required_argnames(user_function))
                 #print('provider requires', requires)
                 return self.add_function(provides, requires, cache)(user_function)
             return func_wrapper
@@ -119,13 +120,27 @@ class Explorer(ExplorerBasic):
         draw_dependency_graph(self.dependency_graph(), **kwargs)
         return f
 
+    def _populate_call_kwd(self, f, current_blackboard):
+        required = self._function_requires[f]
+        # Apply function to blackboard
+        call_kwd = {k: current_blackboard[k] for k in required}
+        # -- pass optional parameters
+        optional = get_optional_argnames(f)
+        print(f'{optional=} {current_blackboard=}')
+        if len(optional):
+            for o_ in optional:
+                try:
+                    call_kwd[o_] = current_blackboard[o_]
+                except KeyError:
+                    continue
+        return call_kwd
+
     def get_variables(self, varnames, **kwargs):
         funcs = self._resolve_call(need=tuple(varnames), have=tuple(list(kwargs.keys())))
         current_blackboard = kwargs
         for f in reversed(funcs):
-            required = self._function_requires[f]
             # Apply function to blackboard
-            call_kwd = {k: current_blackboard[k] for k in required}
+            call_kwd = self._populate_call_kwd(f, current_blackboard)
             retval = f(**call_kwd)
             # Unpack the response
             if isinstance(retval, dict):
@@ -150,9 +165,7 @@ class Explorer(ExplorerBasic):
         funcs = self._resolve_call(need=varnames, have=list(kwargs.keys()))
         current_blackboard = kwargs
         for f in reversed(funcs):
-            required = self._function_requires[f]
-            # Apply function to blackboard
-            call_kwd = {k: current_blackboard[k] for k in required}
+            call_kwd = self._populate_call_kwd(f, current_blackboard)
             this_provides = self._function_provides[f]
             in_cache = self.cache.lookup(f, **call_kwd)
             if in_cache and f.__name__ in no_call:

@@ -5,7 +5,9 @@ from cartesian_explorer import Explorer
 from cartesian_explorer.caches import JobLibCache
 from cartesian_explorer.parallels import JobLib
 
+
 def test_caches(tmpdir):
+    """ Tests if cache indeed caches."""
     cache = JobLibCache(str(tmpdir), verbose=1)
     explorer = Explorer(cache=cache)
     calls = 0
@@ -19,6 +21,19 @@ def test_caches(tmpdir):
     wrapped(a=1, b=2)
     wrapped(a=1, b=2)
     assert calls == 1
+
+def test_works_with_cache(tmpdir):
+    """ Tests if the cache properly wraps functions to allow inspection."""
+    cache = JobLibCache(str(tmpdir), verbose=1)
+    explorer = Explorer(cache=cache)
+    @explorer.provider
+    def c(a, b=1):
+        return a + b
+    z = explorer.get_variable('c', a=2)
+    assert z == 2 + 1
+
+    z = explorer.get_variable('c', a=2, b=2)
+    assert z == 2 + 2
 
 
 # Does not work for .3
