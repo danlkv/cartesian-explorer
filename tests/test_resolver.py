@@ -37,8 +37,10 @@ def test_resolve_complex():
     def mn(y): pass
 
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError) as e:
         funcs_to_call, all_requires = explorer._resolve_call(need=('y',), have=('a',))
+    assert 'circular' in str(e.value)
+    assert 'provider' in str(e.value)
 
     funcs_to_call = explorer._resolve_call(need=('y',), have=('a', 'm', 'n'))
     print('comlex with amn', funcs_to_call)

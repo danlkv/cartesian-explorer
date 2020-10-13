@@ -6,6 +6,10 @@ from cartesian_explorer.lib.dep_graph import dep_graph, draw_dependency_graph
 from cartesian_explorer.lib.argument_inspect import get_required_argnames, get_optional_argnames
 import matplotlib.pyplot as plt
 
+RESOLVER_RECURSION_DEPTH = 15
+class RecursionLimit(RuntimeError):
+    pass
+
 def limit_recurse(limit=10):
     def limit_wrapper(func):
         ncalls = 0
@@ -14,7 +18,7 @@ def limit_recurse(limit=10):
             ncalls += 1
             if ncalls > limit:
                 ncalls = 0
-                raise RuntimeError(f"Recursion limit of {limit} exceeded")
+                raise RecursionLimit(f"Recursion limit of {limit} exceeded")
             ret = func(*args, **kwargs)
             ncalls = 0
             return ret
@@ -56,7 +60,7 @@ class Explorer(ExplorerBasic):
         return tuple(set(funcs_to_call)), tuple(set(next_requires))
 
     @lru_cache
-    @limit_recurse(limit=10)
+    @limit_recurse(limit=RESOLVER_RECURSION_DEPTH)
     def _resolve_call(self, need, have, func_to_call=tuple()):
         #print('resolving', need, 'have', have)
         have = set(have)
@@ -78,7 +82,15 @@ class Explorer(ExplorerBasic):
                 raise ValueError(f'Failed to resolve: no providers for {vars_left}')
             func_to_call = list(func_to_call)  + list(next_funcs)
             have_vars = tuple(set(vars_left) and set(have))
-            return self._resolve_call(next_requires, have_vars, tuple(func_to_call))
+            try:
+                return self._resolve_call(next_requires, have_vars, tuple(func_to_call))
+            except RecursionLimit:
+                print('before resolve')
+                raise RuntimeError("Failed to resolve variables for call. "+
+                                   f"Recursion limit of {RESOLVER_RECURSION_DEPTH} reached. "
+                                   "This can happen if 1) there is no provider for a variable, "
+                                   "2) you have circular dependencies or "
+                                   "3) you have valid dependencies, but with depth larger than 15.")
 
     #-- API
     #---- Input
@@ -126,7 +138,7 @@ class Explorer(ExplorerBasic):
         call_kwd = {k: current_blackboard[k] for k in required}
         # -- pass optional parameters
         optional = get_optional_argnames(f)
-        #print(f'{optional=} {current_blackboard=}')
+        # print(f'{optional=} {current_blackboard=}')
         if len(optional):
             for o_ in optional:
                 try:
@@ -136,7 +148,7 @@ class Explorer(ExplorerBasic):
         return call_kwd
 
     def get_variables(self, varnames, **kwargs):
-        funcs = self._resolve_call(need=tuple(varnames), have=tuple(list(kwargs.keys())))
+        funcs = self._resolve_call(need=tuple(varnames), have=tuple(kwargs.keys()))
         current_blackboard = kwargs
         for f in reversed(funcs):
             # Apply function to blackboard
@@ -162,7 +174,7 @@ class Explorer(ExplorerBasic):
 
     def get_variables_no_call(self, varnames, no_call=[], **kwargs):
         """ This method is experimental. Better use get_variables """
-        funcs = self._resolve_call(need=varnames, have=list(kwargs.keys()))
+        funcs = self._resolve_call(need=tuple(varnames), have=tuple(kwargs.keys()))
         current_blackboard = kwargs
         for f in reversed(funcs):
             call_kwd = self._populate_call_kwd(f, current_blackboard)
