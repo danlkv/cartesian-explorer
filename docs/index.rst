@@ -6,9 +6,14 @@
 Welcome to Cartesian explorer's documentation!
 ==============================================
 
+Example usage: :doc:`Example usage`
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
+   :glob:
+
+   Example usage
 
 
 
