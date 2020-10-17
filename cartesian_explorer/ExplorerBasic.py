@@ -16,10 +16,10 @@ from typing import Dict
 def apply_func(x):
     func, kwargs = x
     return func(**kwargs)
-def just_lookup(func, cache, kwargs):
-    in_cache = cache.lookup(func, **kwargs)
+def just_lookup(user_func, cache, kwargs):
+    in_cache = cache.lookup(user_func, **kwargs)
     if in_cache:
-        return func(**kwargs)
+        return user_func(**kwargs)
 
 class ExplorerBasic:
     def __init__(self, cache_size=512, parallel='thread'
@@ -39,6 +39,29 @@ class ExplorerBasic:
         else:
             self.parallel = parallel
 
+    def _get_iterarg_params(self, value):
+        """ The function that converts user-provided iterable. """
+        if isinstance(value, str):
+            raise ValueError("Won't iterate this string")
+        return list(value), len(value)
+
+    def _iterate_subplots(self, iterargs, subplot_var_key, data):
+        if subplot_var_key is not None:
+            subplots = iterargs[subplot_var_key]
+            f, axs = plt.subplots(1, len(subplots),
+                                  figsize=(len(subplots)*4, 3), dpi=100)
+            data = data.reshape(len(subplots), -1)
+        else:
+            subplots = [None]
+            f = plt.figure(dpi=100)
+            axs = [plt.gca()]
+            data = data[np.newaxis, :]
+        for i, (ax, subplot_val) in enumerate(zip(axs, subplots)):
+            if subplot_val is not None:
+                ax.set_title(f'{subplot_var_key} = {subplot_val}')
+            yield f, ax, data[i]
+
+
     # -- API
 
     # ---- Input
@@ -56,6 +79,43 @@ class ExplorerBasic:
 
     def map(self, func, processes=1, out_dim=None, pbar=True,
             **param_space: Dict[str, iter]):
+        """ Apply a function cartesian product of parameters.
+
+        Args:
+            func (callable): the function to call. Should accept keyword arguments.
+            processes (int): the number of processes for parallelization.
+            out_dim (int): if the function returns a vector,
+                specify the dimension for proper output shape.
+                The vector dimension will become last dimension of the result.
+            pbar (bool): whether to use the progress bar
+
+            **kwargs (dict[str, iter]):
+                each keyword argument should be an iterable.
+                the order of the arguments will be preserved in the output shape.
+
+        Returns:
+            numpy.ndarray: an array of shape ``(N_i, ... [out_dim])``
+                where N_i is the length of i-th iterable.
+
+        Examples:
+
+            >>> arr = ex.map(lambda x, y: x + y, x=[1, 2, 3], y=[3, 4], pbar=False)
+            >>> arr.shape
+            (3, 2)
+            >>> arr
+            array([[4, 5],
+                   [5, 6],
+                   [6, 7]])
+
+            >>> ex.map(lambda x, y: (x, y), x=[1,3,'h'], y=[(12,0)], pbar=False)
+            ValueError: Cannot reshape array of size 6 into sape (3,)
+
+            >>> ex.map(lambda x, y: (x, y), out_dim=2, x=[1,3,'h'], y=[12], pbar=False)
+            array([['1', '3', 'h'],
+                   ['12', '12', '12']], dtype='<U21')
+
+        """
+
         # Uses apply_func
         param_iter = dict_product(**param_space)
         result_shape = tuple(len(x) for x in param_space.values())
@@ -64,50 +124,42 @@ class ExplorerBasic:
         total_len = reduce(np.multiply, result_shape, 1)
         if (processes > 1 and self.parallel_class is not None) or self.parallel:
             parallel = self.parallel or self.parallel_class(processes=processes)
-            result = np.array(
-                parallel.starstarmap(func, param_iter)
-            )
+            result_lin = parallel.starstarmap(func, param_iter)
         else:
             if pbar:
-                result = np.array(list(tqdm(
+                result_lin = list(tqdm(
                     map(lambda x: func(**x), param_iter)
                     , total=total_len
-                )))
+                ))
             else:
-                result = np.array(list(map(lambda x: func(**x), param_iter)))
-        # print('result', result, result_shape)
+                result_lin = list(map(lambda x: func(**x), param_iter))
+
+        # -- Convert to output array. If the element is something vector-ish,
+        # use np.object dtype
+        #print('result', result_lin, result_shape)
         if out_dim:
             result_shape = out_dim, *result_shape
-            result = np.swapaxes(result, 0, -1)
-        return result.reshape(result_shape)
+            result_lin = np.swapaxes(result_lin, 0, -1)
+        try:
+            result = np.array(result_lin).reshape(result_shape)
+        except (TypeError, ValueError) :
+            result = np.array(result_lin, dtype=object).reshape(result_shape)
+        # --
+        return result
 
     def map_no_call(self, func, processes=1, out_dim=None,
                     **param_space: Dict[str, iter]):
-        # Uses just_lookup
+        """ Get cached values of function over cartesian product of parameters.
+
+        API is same as :meth:`cartesian_explorer.ExplorerBasic.map`
+        """
+
         param_iter = dict_product(**param_space)
-        result_shape = tuple(len(x) for x in param_space.values())
-        result_shape = tuple(x for x in result_shape if x > 1)
-        if (processes > 1 and self.parallel_class is not None) or self.parallel:
-            parallel = self.parallel or self.parallel_class(processes=processes)
-            result = np.array(parallel.starmap(
-                    just_lookup,
-                    zip(repeat(func), repeat(self.cache), param_iter))
-                )
-        else:
-            result = np.array(list(map(
-                lambda x: just_lookup(func, self.cache, x),
-                param_iter)))
-        if out_dim:
-            result_shape = out_dim, *result_shape
-            result = np.swapaxes(result, 0, -1)
-        return result.reshape(result_shape)
+        return self.map(just_lookup, processes=processes, out_dim=out_dim,
+                        user_func=[func], cache=[self.cache], kwargs=list(param_iter)
+                       )
 
     # ---- Plotting
-
-    def get_iterarg_params(self, value):
-        if isinstance(value, str):
-            raise ValueError("Won't iterate this string")
-        return list(value), len(value)
 
     def get_iterargs(self, uservars):
         """
@@ -129,7 +181,7 @@ class ExplorerBasic:
         uservars_corrected = {}
         for key in uservars:
             try:
-                x, len_x = self.get_iterarg_params(uservars[key])
+                x, len_x = self._get_iterarg_params(uservars[key])
                 x_label = key
                 uservars_corrected[key] = uservars[key]
                 if len_x == 1:
@@ -140,22 +192,6 @@ class ExplorerBasic:
 
         # print('selected iterargs', var_specs)
         return dict(var_specs), uservars_corrected
-
-    def _iterate_subplots(self, iterargs, subplot_var_key, data):
-        if subplot_var_key is not None:
-            subplots = iterargs[subplot_var_key]
-            f, axs = plt.subplots(1, len(subplots),
-                                  figsize=(len(subplots)*4, 3), dpi=100)
-            data = data.reshape(len(subplots), -1)
-        else:
-            subplots = [None]
-            f = plt.figure(dpi=100)
-            axs = [plt.gca()]
-            data = data[np.newaxis, :]
-        for i, (ax, subplot_val) in enumerate(zip(axs, subplots)):
-            if subplot_val is not None:
-                ax.set_title(f'{subplot_var_key} = {subplot_val}')
-            yield f, ax, data[i]
 
 
     def plot2d(self, func, plot_func=plt.plot, plot_kwargs=dict(), processes=1,
