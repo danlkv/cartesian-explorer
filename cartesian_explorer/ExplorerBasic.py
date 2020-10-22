@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+
 from multiprocessing import Pool
 from multiprocessing.dummy import Pool as ThreadPool
 from functools import reduce
@@ -58,7 +60,7 @@ class ExplorerBasic:
             data = data[np.newaxis, :]
         for i, (ax, subplot_val) in enumerate(zip(axs, subplots)):
             if subplot_val is not None:
-                ax.set_title(f'{subplot_var_key} = {subplot_val}')
+                ax.set_title(f'{subplot_val}')
             yield f, ax, data[i]
 
 
@@ -227,17 +229,40 @@ class ExplorerBasic:
             lines_var_key = plot_level_var_keys.get('lines')
             if lines_var_key is not None:
                 lines = iterargs[lines_var_key]
+                legend_title = lines_var_key
             else:
                 lines = [None]
+                legend_title = None
 
+            data = data.reshape(len(lines), len(x))
             for i, lineval in enumerate(lines):
-                data = data.reshape(len(lines), len(x))
+                line_local_plot_kwargs = {}
                 if lineval is not None:
-                    plot_kwargs['label'] = str(lineval)
-            # --
-                plot_func(x, data[i], **plot_kwargs)
+                    # A: Use name = value format
+                    # plot_kwargs['label'] = f"{lines_var_key} = {str(lineval)}"
+                    # B: Use value format
+                    plot_kwargs['label'] = f"{str(lineval)}"
 
-            plt.legend()
+                    # ---- Set line color
+                    _default_cmap = mpl.cm.get_cmap('gnuplot2')
+                    _cmap = plot_kwargs.get('cmap', _default_cmap)
+                    _c_value = i/(len(lines) - 1)
+                    # Do not include edges
+                    _edge_shift = .24
+                    _c_value = _c_value*(1 - 2*_edge_shift) + _edge_shift
+                    _default_color = _cmap(_c_value)
+                    line_local_plot_kwargs['color'] = _default_color
+                    # ---- 
+
+            # --
+                if plot_kwargs.get('grid', True):
+                    plt.grid(True, color="0.9", which='major')
+                    plt.grid(True, color="0.95", which='minor')
+                # call the plotting function
+                plot_func(x, data[i], **{**plot_kwargs, **line_local_plot_kwargs})
+
+            if legend_title is not None:
+                plt.legend(title=legend_title)
             plt.xlabel(x_var_key)
         return f
 
