@@ -10,11 +10,18 @@ def dep_graph(requires, provides):
             requires[edge_key], provides[edge_key]):
             g.add_edge(u, v, label=(edge_key))
 
+    var_providers = {v:k for k, vars in provides.items() for v in vars}
+    print(var_providers)
 
     sameness = defaultdict(list, {})
     node_to_bunch = {}
     for n in g.nodes:
-        identity = (tuple(g.predecessors(n)), tuple(g.successors(n)))
+        # nodes with same identity will be merged
+        identity = (
+            tuple(g.predecessors(n)),
+            tuple(g.successors(n)),
+            var_providers.get(n)
+        )
         sameness[identity].append(n)
         node_to_bunch[n] = sameness[identity]
 
@@ -32,11 +39,12 @@ def dep_graph(requires, provides):
 def draw_dependency_graph(depg, **kwargs):
     edge_labels = {(u,v):str(data['label'].__name__) for u, v, data in depg.edges.data()}
     if kwargs.get('pos_s') is None:
-        pos_s = nx.fruchterman_reingold_layout(depg,)
+        pos_s = nx.fruchterman_reingold_layout(depg, k=2)
         #pos_s = nx.circular_layout(depg)
         pos_k = nx.kamada_kawai_layout(depg)
         pos = {}
-        beta = .8
+        # ratio of string to shell layout
+        beta = .7
         for key in pos_s:
             pos[key] = beta*pos_k[key] + (1-beta)*pos_s[key]
     else:
