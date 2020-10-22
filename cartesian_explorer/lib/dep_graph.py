@@ -11,7 +11,6 @@ def dep_graph(requires, provides):
             g.add_edge(u, v, label=(edge_key))
 
     var_providers = {v:k for k, vars in provides.items() for v in vars}
-    print(var_providers)
 
     sameness = defaultdict(list, {})
     node_to_bunch = {}
