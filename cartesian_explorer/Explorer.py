@@ -40,6 +40,10 @@ class Explorer(ExplorerBasic):
         self._function_requires[func] = list(requires)
         self._resolve_call.cache_clear()
 
+    def get_provided(self):
+        """ Return all variable names provided by all registered providers. """
+        return list(sum(self._function_provides.values(), []))
+
     def _resolve_1(self, requires):
         funcs_to_call = []
         next_requires = []
@@ -96,6 +100,7 @@ class Explorer(ExplorerBasic):
     #---- Input
 
     def add_function(self, provides: Union[str, tuple] , requires=tuple(), cache=True):
+        """ Decorator that registeres a variable provider. """
         if isinstance(provides, str):
             provides = [provides]
 
@@ -113,6 +118,12 @@ class Explorer(ExplorerBasic):
         return func_wrapper
 
     def provider(self, user_function=None, *args, cache=True):
+        """ Decorator that registeres a variable provider.
+
+        Output variable name is the function name. If you want to use
+            several output variables, use :meth:add_function
+        Input variable names are the argument names
+        """
         if user_function is not None:
             return self.provider(cache=cache)(user_function)
         else:
@@ -125,6 +136,7 @@ class Explorer(ExplorerBasic):
 
     #---- Output
     def dependency_graph(self):
+        """ Return dependency graph of variables. """
         return dep_graph(self._function_requires, self._function_provides)
 
     def draw_dependency_graph(self, figsize=(8, 5), dpi=100, **kwargs):
@@ -178,6 +190,7 @@ class Explorer(ExplorerBasic):
         current_blackboard = kwargs
         for f in reversed(funcs):
             call_kwd = self._populate_call_kwd(f, current_blackboard)
+
             this_provides = self._function_provides[f]
             in_cache = self.cache.lookup(f, **call_kwd)
             if in_cache and f.__name__ in no_call:
@@ -224,6 +237,7 @@ class Explorer(ExplorerBasic):
         fig = self.plot2d(self.get_variable, varname=varnames, **kwargs)
         for ax, name in zip(fig.axes, varnames):
             ax.set_ylabel(name)
+            ax.set_title(None)
         plt.tight_layout()
         return fig
 
