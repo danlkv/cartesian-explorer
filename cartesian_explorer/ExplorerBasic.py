@@ -74,7 +74,7 @@ class ExplorerBasic:
                 cache_size = self.cache_size
             else:
                 cache_size = 512
-            func = self.cache.wrap(func, maxsize=cache_size)
+            func = self.cache(func, maxsize=cache_size)
         return func
 
     # ---- Output
@@ -195,6 +195,95 @@ class ExplorerBasic:
         # print('selected iterargs', var_specs)
         return dict(var_specs), uservars_corrected
 
+    def plot(self, func, plot_func=plt.plot, plot_kwargs=dict(), processes=1,
+             distribution_var=tuple(),
+             **uservars
+            ):
+
+        # -- Check input arg
+        iterargs, uservars_corrected = self.get_iterargs(uservars)
+
+        if isinstance(distribution_var, str):
+            distribution_var = tuple([distribution_var,])
+
+        plot_levels = [
+            'subplots'  # Goes to third to last iterarg if exists
+            ,'lines' # Goes to second to last iterarg, if exists
+            ,'x-axis' # Goes to last iterarg
+        ]
+        distr_levels = [f'distr_{x}' for x in distribution_var]
+        plot_levels += distr_levels
+        plot_level_var_keys = dict(zip(
+            reversed(plot_levels),
+            reversed(tuple(iterargs.keys()))
+        ))
+
+        distribution_dims = len(distribution_var)
+
+        data = self.map(func, processes=processes, **uservars_corrected)
+        # -- Subplots preparation
+        subplot_var_key = plot_level_var_keys.get('subplots')
+        for f, ax, data in self._iterate_subplots(iterargs, subplot_var_key, data):
+            plt.sca(ax)
+        # --
+            x_var_key = plot_level_var_keys.get('x-axis')
+            x = iterargs[x_var_key]
+
+            # -- Lines preparation
+            lines_var_key = plot_level_var_keys.get('lines')
+            if lines_var_key is not None:
+                lines = iterargs[lines_var_key]
+                legend_title = lines_var_key
+            else:
+                lines = [None]
+                legend_title = None
+
+            data = data.reshape(len(lines), len(x), -1)
+            for i, lineval in enumerate(lines):
+                line_local_plot_kwargs = {}
+                if lineval is not None:
+                    # A: Use name = value format
+                    # plot_kwargs['label'] = f"{lines_var_key} = {str(lineval)}"
+                    # B: Use value format
+                    plot_kwargs['label'] = f"{str(lineval)}"
+
+                    # ---- Set line color
+                    _default_cmap = mpl.cm.get_cmap('gnuplot2')
+                    _cmap = plot_kwargs.get('cmap', _default_cmap)
+                    _c_value = i/(len(lines) - 1)
+                    # Do not include edges
+                    _edge_shift = .24
+                    _c_value = _c_value*(1 - 2*_edge_shift) + _edge_shift
+                    _default_color = _cmap(_c_value)
+                    line_local_plot_kwargs['color'] = _default_color
+                    # ---- 
+
+            # --
+                if plot_kwargs.get('grid', True):
+                    plt.grid(True, color="0.9", which='major')
+                    plt.grid(True, color="0.95", which='minor')
+                # -- Handle distribution 
+                line_data = data[i]
+                maximums = np.max(line_data, axis=-1)
+                minimums = np.min(line_data, axis=-1)
+                std = np.std(line_data, axis=-1)
+                mean = np.mean(line_data, axis=-1)
+                # --
+                # call the plotting function
+                plot_func(x, mean, **{**plot_kwargs, **line_local_plot_kwargs})
+                fill_kwargs = dict(
+                    alpha=0.05, color=line_local_plot_kwargs.get('color')
+                )
+                #plt.fill_between(x, minimums, maximums, **fill_kwargs)
+                #plot_func(x, minimums, alpha=0.3, **line_local_plot_kwargs)
+                #plot_func(x, maximums, alpha=0.3, **line_local_plot_kwargs)
+                #plt.fill_between(x, mean-2*std, mean+2*std, **fill_kwargs)
+                plt.fill_between(x, mean-std, mean+std, **fill_kwargs)
+
+            if legend_title is not None:
+                plt.legend(title=legend_title)
+            plt.xlabel(x_var_key)
+        return f
 
     def plot2d(self, func, plot_func=plt.plot, plot_kwargs=dict(), processes=1,
                **uservars):

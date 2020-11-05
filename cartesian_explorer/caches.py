@@ -4,8 +4,10 @@ from cartesian_explorer.lib import lru_cache_mproc as cache2
 import joblib
 
 class CacheIFC:
-    def __call__(self, func):
-        return self.wrap(func)
+    def __call__(self, func, **kwargs):
+        cached = self.wrap(func, **kwargs)
+        cached._original = func
+        return cached
 
     def wrap(self, func, **kwargs) -> callable:
         raise NotImplementedError

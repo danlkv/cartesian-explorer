@@ -1,10 +1,12 @@
-from cartesian_explorer.ExplorerBasic import ExplorerBasic
+import sys
+import matplotlib.pyplot as plt
 from typing import Union
+
+from cartesian_explorer.ExplorerBasic import ExplorerBasic
 from functools import update_wrapper
 from cartesian_explorer.lib.lru_cache import lru_cache
 from cartesian_explorer.lib.dep_graph import dep_graph, draw_dependency_graph
 from cartesian_explorer.lib.argument_inspect import get_required_argnames, get_optional_argnames
-import matplotlib.pyplot as plt
 
 RESOLVER_RECURSION_DEPTH = 15
 class RecursionLimit(RuntimeError):
@@ -29,9 +31,13 @@ def limit_recurse(limit=10):
 class Explorer(ExplorerBasic):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._clear_functions()
+
+    def _clear_functions(self):
         self._variable_providers = {}
         self._function_requires = {}
         self._function_provides = {}
+
 
     def _register_provider(self, func, provides, requires):
         for var in provides:
@@ -39,6 +45,23 @@ class Explorer(ExplorerBasic):
         self._function_provides[func] = list(provides)
         self._function_requires[func] = list(requires)
         self._resolve_call.cache_clear()
+
+    def set_cache(self, cache):
+        """ Set new cache provider for all registered functions
+        Args:
+            cache (cartesian_explorer.caches.cacheIFC): a cache to use.
+        """
+        self.cache = cache
+        functions, provides = zip(*self._function_provides.items())
+        _, requires = zip(*self._function_requires.items())
+        self._clear_functions()
+        for maybe_cached_func, req, prov in zip(functions, requires, provides):
+            try:
+                func = maybe_cached_func._original
+            except AttributeError:
+                func = maybe_cached_func
+
+            self._register_provider(func, prov, req)
 
     def get_provided(self):
         """ Return all variable names provided by all registered providers. """
@@ -231,6 +254,16 @@ class Explorer(ExplorerBasic):
         return self.map_variables_no_call([varname], **kwargs)[0]
 
     #------ Plotting
+    def plot_variables(self, varnames: Union[str, iter], **kwargs):
+        if isinstance(varnames, str):
+            varnames = (varnames, )
+        fig = self.plot(self.get_variable, varname=varnames, **kwargs)
+        for ax, name in zip(fig.axes, varnames):
+            ax.set_ylabel(name)
+            ax.set_title(None)
+        plt.tight_layout()
+        return fig
+
     def plot_variables2d(self, varnames: Union[str, iter], **kwargs):
         if isinstance(varnames, str):
             varnames = (varnames, )
