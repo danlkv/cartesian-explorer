@@ -15,6 +15,23 @@ from cartesian_explorer import parallels
 
 from typing import Dict
 
+def _plot_with_band(x, line_data, **plot_kwargs):
+    maximums = np.max(line_data, axis=-1)
+    minimums = np.min(line_data, axis=-1)
+    std = np.std(line_data, axis=-1)
+    mean = np.mean(line_data, axis=-1)
+    # --
+    # call the plotting function
+    plt.plot(x, mean, **plot_kwargs)
+    fill_kwargs = dict(
+        alpha=0.05, color=plot_kwargs.get('color')
+    )
+    #plt.fill_between(x, minimums, maximums, **fill_kwargs)
+    #plot_func(x, minimums, alpha=0.3, **line_local_plot_kwargs)
+    #plot_func(x, maximums, alpha=0.3, **line_local_plot_kwargs)
+    #plt.fill_between(x, mean-2*std, mean+2*std, **fill_kwargs)
+    plt.fill_between(x, mean-std, mean+std, **fill_kwargs)
+
 def apply_func(x):
     func, kwargs = x
     return func(**kwargs)
@@ -195,7 +212,7 @@ class ExplorerBasic:
         # print('selected iterargs', var_specs)
         return dict(var_specs), uservars_corrected
 
-    def plot(self, func, plot_func=plt.plot, plot_kwargs=dict(), processes=1,
+    def plot(self, func, plot_func=_plot_with_band, plot_kwargs=dict(), processes=1,
              distribution_var=tuple(),
              **uservars
             ):
@@ -264,26 +281,15 @@ class ExplorerBasic:
                     plt.grid(True, color="0.95", which='minor')
                 # -- Handle distribution 
                 line_data = data[i]
-                maximums = np.max(line_data, axis=-1)
-                minimums = np.min(line_data, axis=-1)
-                std = np.std(line_data, axis=-1)
-                mean = np.mean(line_data, axis=-1)
                 # --
                 # call the plotting function
-                plot_func(x, mean, **{**plot_kwargs, **line_local_plot_kwargs})
-                fill_kwargs = dict(
-                    alpha=0.05, color=line_local_plot_kwargs.get('color')
-                )
-                #plt.fill_between(x, minimums, maximums, **fill_kwargs)
-                #plot_func(x, minimums, alpha=0.3, **line_local_plot_kwargs)
-                #plot_func(x, maximums, alpha=0.3, **line_local_plot_kwargs)
-                #plt.fill_between(x, mean-2*std, mean+2*std, **fill_kwargs)
-                plt.fill_between(x, mean-std, mean+std, **fill_kwargs)
+                plot_func(x, line_data, **{**plot_kwargs, **line_local_plot_kwargs})
 
             if legend_title is not None:
                 plt.legend(title=legend_title)
             plt.xlabel(x_var_key)
         return f
+
 
     def plot2d(self, func, plot_func=plt.plot, plot_kwargs=dict(), processes=1,
                **uservars):

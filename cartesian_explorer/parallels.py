@@ -1,7 +1,20 @@
 import multiprocessing as mproc
+import logging
 import multiprocessing.dummy as thrd
 import joblib
 from itertools import repeat
+import importlib
+class LazyModule:
+    def __init__(self, module_name):
+        self.module = None
+        self.module_name = module_name
+
+    def __getattr__(self, prop):
+        if self.module is None:
+            self.module = importlib.import_module(self.module_name)
+        return self.module.__getattribute__(prop)
+
+ray = LazyModule('ray')
 
 def apply_kwargs(pair):
     func, kwargs = pair
@@ -43,3 +56,15 @@ class JobLib(ParallelIFC):
     def map(self, func, args):
         r = self.par(joblib.delayed(func)(x) for x in args)
         return r
+
+class Ray(ParallelIFC):
+    def __init__(self, processes=2, *args, **kwargs):
+        super().__init__(processes=processes)
+        ray.init(ignore_reinit_error=True,
+                 log_to_driver=False,
+                )
+
+    def map(self, func, args):
+        func = ray.remote(func)
+        r = [func.remote(x) for x in args]
+        return ray.get(r)
