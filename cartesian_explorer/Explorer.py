@@ -180,6 +180,7 @@ class Explorer(ExplorerBasic):
                     call_kwd[o_] = current_blackboard[o_]
                 except KeyError:
                     continue
+        # print(f'{call_kwd=} {current_blackboard=}')
         return call_kwd
 
     def get_variables(self, varnames, **kwargs):
@@ -214,9 +215,14 @@ class Explorer(ExplorerBasic):
         for f in reversed(funcs):
             call_kwd = self._populate_call_kwd(f, current_blackboard)
 
+
             this_provides = self._function_provides[f]
-            in_cache = self.cache.lookup(f, **call_kwd)
-            if in_cache and f.__name__ in no_call:
+            try:
+                in_cache = self.cache.lookup(f, **call_kwd)
+            except AttributeError:
+                # f is probably just a function
+                in_cache = True
+            if in_cache:
                 retval = f(**call_kwd)
             else:
                 retval = tuple([None]*len(this_provides))
@@ -245,7 +251,7 @@ class Explorer(ExplorerBasic):
         return self.map(self.get_variables, varnames=[varnames], out_dim=len(varnames), **kwargs)
 
     def map_variables_no_call(self, varnames, **kwargs):
-        return self.map_no_call(self.get_variables, varnames=[varnames], out_dim=len(varnames), **kwargs)
+        return self.map(self.get_variables_no_call, varnames=[varnames], out_dim=len(varnames), **kwargs)
 
     def map_variable(self, varname, **kwargs):
         return self.map_variables([varname], **kwargs)[0]
