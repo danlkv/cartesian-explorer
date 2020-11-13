@@ -183,40 +183,60 @@ class Explorer(ExplorerBasic):
         # print(f'{call_kwd=} {current_blackboard=}')
         return call_kwd
 
+    def _update_blackboard(self, current_blackboard, f, retval):
+        """
+        Update the blackboard dict in-place.
+
+        Args:
+            current_blackboard (dict): blackboard dictionary
+            f (callable): current function
+            retval: value that function returned
+                and is to be applied to blackboard
+
+        """
+
+        this_provides = self._function_provides[f]
+        if isinstance(retval, dict):
+            current_blackboard.update(retval)
+        else:
+            # Create dict to update current blackboard
+            if len(this_provides)>1 and isinstance(retval, tuple):
+                ret_len = len(retval)
+            else:
+                ret_len = 1
+                retval = [retval]
+            current_blackboard.update(
+                {varname: val for varname, val in zip(this_provides, retval)}
+            )
+            if not len(this_provides) == ret_len:
+                raise RuntimeWarning(f'Your function `{f.__name__}` returned {ret_len} values, but was registered to provide {this_provides}')
+
     def get_variables(self, varnames, **kwargs):
         funcs = self._resolve_call(need=tuple(varnames), have=tuple(kwargs.keys()))
         current_blackboard = kwargs
         for f in reversed(funcs):
-            # Apply function to blackboard
+            # Apply function to the blackboard
             call_kwd = self._populate_call_kwd(f, current_blackboard)
             retval = f(**call_kwd)
             # Unpack the response
-            if isinstance(retval, dict):
-                current_blackboard.update(retval)
-            else:
-                # Create dict to update current blackboard
-                this_provides = self._function_provides[f]
-                if len(this_provides)>1 and isinstance(retval, tuple):
-                    ret_len = len(retval)
-                else:
-                    ret_len = 1
-                    retval = [retval]
-                current_blackboard.update(
-                    {varname: val for varname, val in zip(this_provides, retval)}
-                )
-                if not len(this_provides) == ret_len:
-                    raise RuntimeWarning(f'Your function `{f.__name__}` returned {ret_len} values, but was registered to provide {this_provides}')
+            self._update_blackboard(current_blackboard, f, retval)
         return [current_blackboard[name] for name in varnames]
 
     def get_variables_no_call(self, varnames, no_call=[], **kwargs):
-        """ This method is experimental. Better use get_variables """
+        """
+        Get values for variables without calling cached functions.
+
+        If the value is not in cache, return None
+
+        This method is experimental.
+        """
+
         funcs = self._resolve_call(need=tuple(varnames), have=tuple(kwargs.keys()))
         current_blackboard = kwargs
         for f in reversed(funcs):
             call_kwd = self._populate_call_kwd(f, current_blackboard)
 
-
-            this_provides = self._function_provides[f]
+            # -- Cache lookup 
             try:
                 in_cache = self.cache.lookup(f, **call_kwd)
             except AttributeError:
@@ -225,22 +245,12 @@ class Explorer(ExplorerBasic):
             if in_cache:
                 retval = f(**call_kwd)
             else:
+                this_provides = self._function_provides[f]
                 retval = tuple([None]*len(this_provides))
+            #--
+
+            self._update_blackboard(current_blackboard, f, retval)
             # Unpack the response
-            if isinstance(retval, dict):
-                current_blackboard.update(retval)
-            else:
-                # Create dict to update current blackboard
-                if len(this_provides)>1 and isinstance(retval, tuple):
-                    ret_len = len(retval)
-                else:
-                    ret_len = 1
-                    retval = [retval]
-                current_blackboard.update(
-                    {varname: val for varname, val in zip(this_provides, retval)}
-                )
-                if not len(this_provides) == ret_len:
-                    raise RuntimeWarning(f'Your function `{f.__name__}` returned {ret_len} values, but was registered to provide {this_provides}')
         return [current_blackboard[name] for name in varnames]
 
     def get_variable(self, varname, **kwargs):

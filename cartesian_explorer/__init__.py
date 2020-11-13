@@ -9,6 +9,20 @@ from cartesian_explorer.lib.dict_product import dict_product
 from cartesian_explorer.Explorer import Explorer
 
 def get_example_explorer():
+    """ Create a demonstrative explorer.
+
+    The explorer describes radioactve decay
+    of Pb isotopes.
+
+    Provides:
+        Mass: mass left of isotope of type `isotope`
+        Speed: curernt speed of decay at `time_sec`
+
+    Requires:
+        time_sec: time to calculate outputs at.
+        isotope: type of isotope: one of "Pb186", "Pb187", "Pb188"
+
+    """
     import numpy as np
     ex = Explorer()
     @ex.provider
