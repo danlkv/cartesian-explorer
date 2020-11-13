@@ -1,4 +1,4 @@
-__version__ = '0.1.8'
+__version__ = '0.1.9'
 import logging
 mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)
