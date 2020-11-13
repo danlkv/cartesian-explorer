@@ -1,4 +1,3 @@
-import sys
 import matplotlib.pyplot as plt
 from typing import Union
 
@@ -7,6 +6,7 @@ from functools import update_wrapper
 from cartesian_explorer.lib.lru_cache import lru_cache
 from cartesian_explorer.lib.dep_graph import dep_graph, draw_dependency_graph
 from cartesian_explorer.lib.argument_inspect import get_required_argnames, get_optional_argnames
+from cartesian_explorer import lazy_imports
 
 RESOLVER_RECURSION_DEPTH = 15
 class RecursionLimit(RuntimeError):
@@ -257,6 +257,7 @@ class Explorer(ExplorerBasic):
         return self.get_variables([varname], **kwargs)[0]
 
     #------ Mappers
+
     def map_variables(self, varnames, **kwargs):
         return self.map(self.get_variables, varnames=[varnames], out_dim=len(varnames), **kwargs)
 
@@ -268,6 +269,32 @@ class Explorer(ExplorerBasic):
 
     def map_variable_no_call(self, varname, **kwargs):
         return self.map_variables_no_call([varname], **kwargs)[0]
+
+    def get_variables_xarray(self, varnames, **kwargs):
+        """
+        Return a xarray DataArray with mapped values
+
+        If number of variables is >= 2, the 'varname' dimension
+        has values for each variable
+
+        """
+        if isinstance(varnames, str):
+            data = self.map_variable(varnames, **kwargs)
+            outdim = 0
+        else:
+            data = self.map_variables(varnames, **kwargs)
+            outdim = len(varnames)
+
+        _dimcount = len(data.shape)
+        _dimnames = list(kwargs.keys())[-_dimcount:]
+        dimvals = {k:kwargs[k] for k in _dimnames}
+        if outdim:
+            dimvals = {**{'varname': list(varnames)}, **dimvals}
+        return lazy_imports.xarray.DataArray(
+            data, dims=list(dimvals.keys()), coords=dimvals
+        )
+
+
 
     #------ Plotting
     def plot_variables(self, varnames: Union[str, iter], **kwargs):
