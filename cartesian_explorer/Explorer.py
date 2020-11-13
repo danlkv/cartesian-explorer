@@ -297,6 +297,25 @@ class Explorer(ExplorerBasic):
 
 
     #------ Plotting
+
+    def plot_xarray(self, xar, **kwargs):
+        """
+        Plod data from xarray object
+        """
+
+        # Why, just why don't you preserve the order in coords??
+        dims = {k:xar.coords[k].data for k in xar.dims}
+        kwargs = {**kwargs, **dims}
+        fig = self.plot(xar.sel, **kwargs)
+
+        varnames = dims.get('varname', ('value', ))
+
+        for ax, name in zip(fig.axes, varnames):
+            ax.set_ylabel(name)
+            ax.set_title(None)
+        plt.tight_layout()
+        return fig
+
     def plot_variables(self, varnames: Union[str, iter], **kwargs):
         if isinstance(varnames, str):
             varnames = (varnames, )
