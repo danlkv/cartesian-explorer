@@ -306,7 +306,13 @@ class Explorer(ExplorerBasic):
         # Why, just why don't you preserve the order in coords??
         dims = {k:xar.coords[k].data for k in xar.dims}
         kwargs = {**kwargs, **dims}
-        fig = self.plot(xar.sel, **kwargs)
+        def safe_sel(*args, **kwargs):
+            try:
+                # the following line raises if we had None value
+                return xar.sel(*args, **kwargs).__float__()
+            except Exception:
+                return None
+        fig = self.plot2d(safe_sel, **kwargs)
 
         varnames = dims.get('varname', ('value', ))
 
