@@ -286,8 +286,9 @@ class Explorer(ExplorerBasic):
             outdim = len(varnames)
 
         _dimcount = len(data.shape)
-        _dimnames = list(kwargs.keys())[-_dimcount:]
-        dimvals = {k:kwargs[k] for k in _dimnames}
+        print('_dimcount', _dimcount)
+        _dimnames = list(kwargs.keys())
+        dimvals = {k:kwargs[k] for k in _dimnames if len(kwargs[k]) > 1}
         if outdim:
             dimvals = {**{'varname': list(varnames)}, **dimvals}
         return lazy_imports.xarray.DataArray(
