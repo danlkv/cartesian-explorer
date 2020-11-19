@@ -1,5 +1,6 @@
 from cartesian_explorer.lib import lru_cache as cache1
 from cartesian_explorer.lib import lru_cache_mproc as cache2
+from cartesian_explorer.lib import lru_cache_diskcache as cache_disk
 
 import joblib
 
@@ -26,14 +27,14 @@ class FunctoolsCache(CacheIFC):
     def wrap(self, func, **kwargs) -> callable:
         return cache1.lru_cache(**kwargs)(func)
 
-    def call(func, *args, **kwargs):
-        return func(*args, **kwargs)
-
     def lookup(self, func, *args, **kwargs):
         sentinel = None
         key = cache1._make_key(args, kwargs, typed=False)
         val = func.cache_get(key, sentinel)
         return (val is not sentinel)
+
+    def call(func, *args, **kwargs):
+        return func(*args, **kwargs)
 
     def clear(self, func):
         func.cache_clear()
@@ -48,6 +49,21 @@ class FunctoolsCache_Mproc(FunctoolsCache):
     def lookup(self, func, *args, **kwargs):
         sentinel = None
         key = cache2._make_key(args, kwargs, typed=False)
+        val = func.cache_get(key, sentinel)
+        print('lookup get', val)
+        return (val is not sentinel)
+
+class FunctoolsCache_Disk(FunctoolsCache):
+    def __init__(self, directory):
+        self.directory = directory
+
+    def wrap(self, func, **kwargs) -> callable:
+        kwargs['directory'] = self.directory
+        return cache_disk.lru_cache(**kwargs)(func)
+
+    def lookup(self, func, *args, **kwargs):
+        sentinel = None
+        key = cache_disk._make_key(args, kwargs, typed=False)
         val = func.cache_get(key, sentinel)
         print('lookup get', val)
         return (val is not sentinel)

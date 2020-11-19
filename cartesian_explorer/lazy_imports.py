@@ -17,3 +17,4 @@ class LasyModule:
         return self.module.__getattribute__(attr)
 
 xarray = LasyModule('xarray')
+diskcache = LasyModule('diskcache')
