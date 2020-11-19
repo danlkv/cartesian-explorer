@@ -48,9 +48,10 @@ class Thread(ParallelIFC):
             return pool.map(func, args)
 
 class JobLib(ParallelIFC):
-    def __init__(self, processes=2, *args, **kwargs):
+    def __init__(self, processes=None, *args, **kwargs):
         super().__init__(processes=processes)
-        kwargs['n_jobs'] = kwargs.get('n_jobs', processes)
+        if processes:
+            kwargs['n_jobs'] = kwargs.get('n_jobs', processes)
         self.par = joblib.Parallel(*args, **kwargs)
 
     def map(self, func, args):
@@ -58,11 +59,13 @@ class JobLib(ParallelIFC):
         return r
 
 class Ray(ParallelIFC):
-    def __init__(self, processes=2, *args, **kwargs):
+    def __init__(self, processes=None, *args, **kwargs):
         super().__init__(processes=processes)
-        ray.init(ignore_reinit_error=True,
-                 log_to_driver=False,
-                )
+        kwargs['ignore_reinit_error'] = kwargs.get('ignore_reinit_error', True)
+        kwargs['log_to_driver'] = kwargs.get('log_to_driver', False)
+        if processes:
+            kwargs['num_cpus'] = kwargs.get('num_cpus', processes)
+        ray.init(*args, **kwargs)
 
     def map(self, func, args):
         func = ray.remote(func)
