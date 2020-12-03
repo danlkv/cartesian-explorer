@@ -55,6 +55,8 @@ class ExplorerBasic:
                 self.parallel_class = parallels.Multiprocess
             elif parallel == 'joblib':
                 self.parallel_class = parallels.JobLib
+            elif parallel == 'ray':
+                self.parallel_class = parallels.Ray
         else:
             self.parallel = parallel
 
