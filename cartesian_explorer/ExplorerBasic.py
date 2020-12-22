@@ -16,10 +16,12 @@ from cartesian_explorer import parallels
 from typing import Dict
 
 def _plot_with_band(x, line_data, **plot_kwargs):
+    line_data = line_data.astype(np.float64)
     maximums = np.max(line_data, axis=-1)
     minimums = np.min(line_data, axis=-1)
+
     std = np.std(line_data, axis=-1)
-    mean = np.mean(line_data, axis=-1)
+    mean = np.nanmean(line_data, axis=-1)
     # --
     # call the plotting function
     plt.plot(x, mean, **plot_kwargs)
