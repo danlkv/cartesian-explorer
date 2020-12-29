@@ -58,3 +58,11 @@ Cache
     wrapped(a=1, b=2)
     my_function.assert_called_once_with(a=1, b=2)
 
+
+TODO
+----
+
+- [ ] Interpolation, extrapolation
+- [ ] Vectorized providers
+- [x] Plot distribution props along additional distribution var
+- 
