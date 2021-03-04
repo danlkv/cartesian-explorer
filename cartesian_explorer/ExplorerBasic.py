@@ -17,10 +17,10 @@ from typing import Dict
 
 def _plot_with_band(x, line_data, **plot_kwargs):
     line_data = line_data.astype(np.float64)
-    maximums = np.max(line_data, axis=-1)
-    minimums = np.min(line_data, axis=-1)
+    #maximums = np.nanmax(line_data, axis=-1)
+    #minimums = np.nanmin(line_data, axis=-1)
 
-    std = np.std(line_data, axis=-1)
+    std = np.nanstd(line_data, axis=-1)
     mean = np.nanmean(line_data, axis=-1)
     # --
     # call the plotting function
@@ -235,7 +235,6 @@ class ExplorerBasic:
         distr_levels = [f'distr_{x}' for x in distribution_var]
         plot_levels += distr_levels
         plot_level_var_keys = dict(zip(
-            reversed(plot_levels),
             reversed(tuple(iterargs.keys()))
         ))
 
