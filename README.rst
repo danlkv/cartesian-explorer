@@ -18,6 +18,9 @@ Cartesian Explorer
 A handy tool to map functions over their domains.
 
 
+.. image:: docs/Screenshot%20from%202021-03-05%2022-05-32.png
+
+
 
 Works:
 
