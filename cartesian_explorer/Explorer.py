@@ -1,10 +1,11 @@
 import matplotlib.pyplot as plt
+import numpy as np
 from typing import Union
 
 from cartesian_explorer.ExplorerBasic import ExplorerBasic
 from functools import update_wrapper
 from cartesian_explorer.lib.lru_cache import lru_cache
-from cartesian_explorer.lib.dep_graph import dep_graph, draw_dependency_graph
+from cartesian_explorer.lib.dep_graph import dep_graph, draw_dependency_graph, draw_dependency_graph_graphviz
 from cartesian_explorer.lib.argument_inspect import get_required_argnames, get_optional_argnames
 from cartesian_explorer import lazy_imports
 
@@ -162,9 +163,12 @@ class Explorer(ExplorerBasic):
         """ Return dependency graph of variables. """
         return dep_graph(self._function_requires, self._function_provides)
 
-    def draw_dependency_graph(self, figsize=(8, 5), dpi=100, **kwargs):
+    def draw_dependency_graph(self, figsize=(8, 5), dpi=100, networkx=True, **kwargs):
         f = plt.figure(figsize=figsize, dpi=dpi)
-        draw_dependency_graph(self.dependency_graph(), **kwargs)
+        if networkx:
+            draw_dependency_graph(self.dependency_graph(), **kwargs)
+        else:
+            draw_dependency_graph_graphviz(self.dependency_graph(), **kwargs)
         return f
 
     def _populate_call_kwd(self, f, current_blackboard):
@@ -298,6 +302,23 @@ class Explorer(ExplorerBasic):
 
 
     #------ Plotting
+    
+    def set_matplotlib_formats(self, fmt):
+        """ Set format of output to use for Ipython display"""
+        from IPython.display import set_matplotlib_formats
+        set_matplotlib_formats(fmt)
+    def use_svg(self):
+        self.set_matplotlib_formats('svg')
+    def use_png(self):
+        self.set_matplotlib_formats('png')
+
+    def _set_axes_titles(self, fig, varnames):
+        axes = np.array(fig.axes).flatten()
+        for ax, name in zip(axes, varnames*(len(axes)//len(varnames))):
+            ax.set_ylabel(name)
+            #ax.set_title(None)
+        plt.tight_layout()
+
 
     def plot_xarray(self, xar, **kwargs):
         """
@@ -317,31 +338,49 @@ class Explorer(ExplorerBasic):
 
         varnames = dims.get('varname', ('value', ))
 
-        for ax, name in zip(fig.axes, varnames):
-            ax.set_ylabel(name)
-            ax.set_title(None)
-        plt.tight_layout()
+        self._set_axes_titles(fig, varnames)
         return fig
 
-    def plot_variables(self, varnames: Union[str, iter], **kwargs):
+    def plot_variables(self, *args, **kwargs):
+        """
+        Plot variables with respect to different input parameters.
+
+        Example:
+
+            >>> ex.plot_variables(('var1', 'var2'), attr1=[1,2])
+            >>> ex.plot_variables(varname=('var1', 'var2'), attr1=[1,2])
+            >>> ex.plot_variables(attr1=[1,2], varname=('var1', 'var2'))
+
+            Note that example 2 and 3 are not equivalent and produce
+            different transpositions
+
+        Args:
+            varname (str or list[str]): variable name provided by functions
+
+        Returns:
+            matplotlib.pyplot.figure
+        """
+
+        kw_ordered = {}
+        if len(args):
+            varnames=args[0]
+            kw_ordered['varname'] = varnames
+        else:
+            varnames=kwargs['varname']
+
         if isinstance(varnames, str):
             varnames = (varnames, )
-        fig = self.plot(self.get_variable, varname=varnames, **kwargs)
-        for ax, name in zip(fig.axes, varnames):
-            ax.set_ylabel(name)
-            ax.set_title(None)
-        plt.tight_layout()
+
+        for k, v in kwargs.items():
+            kw_ordered[k] = v
+
+        fig = self.plot(self.get_variable, **kw_ordered)
+
+        self._set_axes_titles(fig, varnames)
         return fig
 
-    def plot_variables2d(self, varnames: Union[str, iter], **kwargs):
-        if isinstance(varnames, str):
-            varnames = (varnames, )
-        fig = self.plot2d(self.get_variable, varname=varnames, **kwargs)
-        for ax, name in zip(fig.axes, varnames):
-            ax.set_ylabel(name)
-            ax.set_title(None)
-        plt.tight_layout()
-        return fig
+    def plot_variables2d(self, *args, **kwargs):
+        return self.plot_variables(*args, **kwargs)
 
     def plot_variables3d(self, varnames: Union[str, iter], **kwargs):
         if isinstance(varnames, str):
