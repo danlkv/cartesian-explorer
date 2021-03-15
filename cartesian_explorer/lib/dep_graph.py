@@ -79,7 +79,7 @@ def draw_dependency_graph(depg, **kwargs):
     kwargs['font_size'] = kwargs.get('font_size', 8)
     kwargs['arrowsize'] = kwargs.get('arrowsize', 15)
     edge_labels = kwargs.get('edge_labels', edge_labels) # dirty patch
-    del kwargs['edge_labels'] # dirty patch
+    kwargs.pop('edge_labels', 0) # dirty patch
 
     nx.draw_networkx(depg, with_labels=False, **kwargs)
     del kwargs['node_color']
@@ -122,6 +122,7 @@ def draw_dependency_graph_graphviz(depg, **kwargs):
     nx.set_node_attributes(depg, node_props)
 
     G = nx.nx_agraph.to_agraph(depg)
+    #G.graph_attr.update(size='"20,8!"')
     G.layout()
     G.draw('/tmp/caex_dep_graph.png')
     img = matplotlib.image.imread('/tmp/caex_dep_graph.png')

@@ -5,7 +5,8 @@ import matplotlib as mpl
 from multiprocessing import Pool
 from multiprocessing.dummy import Pool as ThreadPool
 from functools import reduce
-from itertools import repeat
+import itertools
+
 from tqdm.auto import tqdm
 
 from cartesian_explorer import caches
@@ -19,10 +20,10 @@ CAEX_PLOT_KWG = ['band_alpha']
 
 def _plot_with_band(x, line_data, **plot_kwargs):
     line_data = line_data.astype(np.float64)
-    maximums = np.max(line_data, axis=-1)
-    minimums = np.min(line_data, axis=-1)
+    #maximums = np.nanmax(line_data, axis=-1)
+    #minimums = np.nanmin(line_data, axis=-1)
 
-    std = np.std(line_data, axis=-1)
+    std = np.nanstd(line_data, axis=-1)
     mean = np.nanmean(line_data, axis=-1)
     # --
     # call the plotting function
@@ -45,6 +46,22 @@ def just_lookup(user_func, cache, kwargs):
     if in_cache:
         return user_func(**kwargs)
 
+def get_plot_level_var_keys(iterargs, distribution_var=tuple()):
+    plot_levels = [
+        'subplot_rows'
+        ,'subplots'  # Goes to third to last iterarg if exists
+        ,'lines' # Goes to second to last iterarg, if exists
+        ,'x-axis' # Goes to last iterarg
+    ]
+    distr_levels = [f'distr_{x}' for x in distribution_var]
+    plot_levels += distr_levels
+    plot_level_var_keys = dict(zip(
+        reversed(plot_levels),
+        reversed(tuple(iterargs.keys()))
+    ))
+    return plot_level_var_keys
+
+
 class ExplorerBasic:
     def __init__(self, cache_size=512, parallel='thread'
                  , cache=caches.FunctoolsCache()
@@ -64,6 +81,20 @@ class ExplorerBasic:
                 self.parallel_class = parallels.Ray
         else:
             self.parallel = parallel
+        self.dpi = 100
+        self.size = 4, 3
+
+    def set_dpi(self, dpi):
+        self.dpi = dpi
+    def set_size(self, *size):
+        """ Set default size for plotting in subplots.
+
+        Args:
+            width (float): width of subplot in inches
+            height (float): height of subplot in inches
+
+        """
+        self.size = size
 
     def _get_iterarg_params(self, value):
         """ The function that converts user-provided iterable. """
@@ -71,20 +102,38 @@ class ExplorerBasic:
             raise ValueError("Won't iterate this string")
         return list(value), len(value)
 
-    def _iterate_subplots(self, iterargs, subplot_var_key, data):
+    def _iterate_subplots(self, iterargs, plot_level_var_keys, data):
+        subplot_var_key = plot_level_var_keys.get('subplots')
+        plot_row_var_key = plot_level_var_keys.get('subplot_rows')
+
+        # -- prepare subplots
         if subplot_var_key is not None:
-            subplots = iterargs[subplot_var_key]
-            f, axs = plt.subplots(1, len(subplots),
-                                  figsize=(len(subplots)*4, 3), dpi=100)
-            data = data.reshape(len(subplots), -1)
+            ax_titles = [subplot_var_key +'='+ x for x in  iterargs[subplot_var_key]]
+            ncols = len(ax_titles)
+            if plot_row_var_key is not None:
+                rows = iterargs[plot_row_var_key]
+                row_titles = [plot_row_var_key+'='+x for x in rows]
+                ax_titles = itertools.product(row_titles, ax_titles)
+                ax_titles = [' '.join(x) for x in ax_titles]
+                nrows = len(rows)
+            else:
+                nrows = 1
+
+            f, axs = plt.subplots(nrows, ncols,
+                                  figsize=(self.size[0]*ncols, self.size[1]*nrows), dpi=self.dpi)
+            # axs is a numpy array, with first index for rows, second for columns
+            axs = axs.flatten()
+            # the layout of dimensions should be row_var, col_var
+            data = data.reshape(nrows*ncols, -1)
         else:
-            subplots = [None]
+            ax_titles = [None]
             f = plt.figure(dpi=100)
             axs = [plt.gca()]
             data = data[np.newaxis, :]
-        for i, (ax, subplot_val) in enumerate(zip(axs, subplots)):
-            if subplot_val is not None:
-                ax.set_title(f'{subplot_val}')
+        # --
+        for i, (ax, title) in enumerate(zip(axs, ax_titles)):
+            if title is not None:
+                ax.set_title(title)
             yield f, ax, data[i]
 
 
@@ -230,24 +279,13 @@ class ExplorerBasic:
         if isinstance(distribution_var, str):
             distribution_var = tuple([distribution_var,])
 
-        plot_levels = [
-            'subplots'  # Goes to third to last iterarg if exists
-            ,'lines' # Goes to second to last iterarg, if exists
-            ,'x-axis' # Goes to last iterarg
-        ]
-        distr_levels = [f'distr_{x}' for x in distribution_var]
-        plot_levels += distr_levels
-        plot_level_var_keys = dict(zip(
-            reversed(plot_levels),
-            reversed(tuple(iterargs.keys()))
-        ))
+        plot_level_var_keys = get_plot_level_var_keys(iterargs, distribution_var)
 
         distribution_dims = len(distribution_var)
 
         data = self.map(func, processes=processes, **uservars_corrected)
         # -- Subplots preparation
-        subplot_var_key = plot_level_var_keys.get('subplots')
-        for f, ax, data in self._iterate_subplots(iterargs, subplot_var_key, data):
+        for f, ax, data in self._iterate_subplots(iterargs, plot_level_var_keys, data):
             plt.sca(ax)
         # --
             x_var_key = plot_level_var_keys.get('x-axis')
@@ -304,22 +342,13 @@ class ExplorerBasic:
         # -- Check input arg
         iterargs, uservars_corrected = self.get_iterargs(uservars)
         #print('iterargs', iterargs)
-        plot_levels = [
-            'subplots'  # Goes to third to last iterarg if exists
-            ,'lines' # Goes to second to last iterarg, if exists
-            ,'x-axis' # Goes to last iterarg
-        ]
-        plot_level_var_keys = dict(zip(
-            reversed(plot_levels),
-            reversed(tuple(iterargs.keys()))
-        ))
+        plot_level_var_keys = get_plot_level_var_keys(iterargs)
         #print('plot level vars', plot_level_var_keys)
 
         data = self.map(func, processes=processes, **uservars_corrected)
 
         # -- Subplots preparation
-        subplot_var_key = plot_level_var_keys.get('subplots')
-        for f, ax, data in self._iterate_subplots(iterargs, subplot_var_key, data):
+        for f, ax, data in self._iterate_subplots(iterargs, plot_level_var_keys, data):
             plt.sca(ax)
         # --
 
@@ -388,8 +417,8 @@ class ExplorerBasic:
         data = self.map(func, processes=processes, **uservars_corrected)
 
         # -- Subplots preparation
-        subplot_var_key = plot_level_var_keys.get('subplots')
-        for f, ax, data in self._iterate_subplots(iterargs, subplot_var_key, data):
+        #subplot_var_key = plot_level_var_keys.get('subplots')
+        for f, ax, data in self._iterate_subplots(iterargs, plot_level_var_keys, data):
             plt.sca(ax)
         # --
             x_label, y_label = plot_level_var_keys['x'], plot_level_var_keys['y']
