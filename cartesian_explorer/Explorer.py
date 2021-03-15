@@ -8,6 +8,8 @@ from cartesian_explorer.lib.dep_graph import dep_graph, draw_dependency_graph
 from cartesian_explorer.lib.argument_inspect import get_required_argnames, get_optional_argnames
 from cartesian_explorer import lazy_imports
 
+import joblib
+
 RESOLVER_RECURSION_DEPTH = 15
 class RecursionLimit(RuntimeError):
     pass
@@ -217,9 +219,12 @@ class Explorer(ExplorerBasic):
         for f in reversed(funcs):
             # Apply function to the blackboard
             call_kwd = self._populate_call_kwd(f, current_blackboard)
+            #print('calll_kw_hash', joblib.hashing.hash(call_kwd))
+            #print('f',f ,'calll_kw_hash', {k:joblib.hashing.hash(v) for k, v in call_kwd.items()})
             retval = f(**call_kwd)
             # Unpack the response
             self._update_blackboard(current_blackboard, f, retval)
+            #print('returned. blackboard:', {k:joblib.hashing.hash(v) for k, v in current_blackboard.items()})
         return [current_blackboard[name] for name in varnames]
 
     def get_variables_no_call(self, varnames, no_call=[], **kwargs):
@@ -313,13 +318,19 @@ class Explorer(ExplorerBasic):
                 return xar.sel(*args, **kwargs).__float__()
             except Exception:
                 return None
-        fig = self.plot2d(safe_sel, **kwargs)
+        fig = self.plot(safe_sel, **kwargs)
 
-        varnames = dims.get('varname', ('value', ))
+        topmost_dim_name = list(dims.keys())[0]
+        if topmost_dim_name == 'varname':
+            varnames = dims.get('varname', ('value', ))
+            for ax, name in zip(fig.axes, varnames):
+                ax.set_ylabel(name)
+                ax.set_title(None)
+        else:
+            varnames = dims.get(topmost_dim_name)
+            for ax, val in zip(fig.axes, varnames):
+                ax.set_title(f"{topmost_dim_name}={val}")
 
-        for ax, name in zip(fig.axes, varnames):
-            ax.set_ylabel(name)
-            ax.set_title(None)
         plt.tight_layout()
         return fig
 

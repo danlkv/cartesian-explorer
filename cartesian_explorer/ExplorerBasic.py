@@ -15,6 +15,8 @@ from cartesian_explorer import parallels
 
 from typing import Dict
 
+CAEX_PLOT_KWG = ['band_alpha']
+
 def _plot_with_band(x, line_data, **plot_kwargs):
     line_data = line_data.astype(np.float64)
     maximums = np.max(line_data, axis=-1)
@@ -24,10 +26,11 @@ def _plot_with_band(x, line_data, **plot_kwargs):
     mean = np.nanmean(line_data, axis=-1)
     # --
     # call the plotting function
-    plt.plot(x, mean, **plot_kwargs)
     fill_kwargs = dict(
-        alpha=0.05, color=plot_kwargs.get('color')
+        alpha=plot_kwargs.get('band_alpha', 0.05), color=plot_kwargs.get('color')
     )
+    [plot_kwargs.pop(x, None) for x in CAEX_PLOT_KWG]
+    plt.plot(x, mean, **plot_kwargs)
     #plt.fill_between(x, minimums, maximums, **fill_kwargs)
     #plot_func(x, minimums, alpha=0.3, **line_local_plot_kwargs)
     #plot_func(x, maximums, alpha=0.3, **line_local_plot_kwargs)
