@@ -3,7 +3,7 @@ History
 =======
 
 0.1.12 (2020-09-29)
-------------------
+-------------------
 
 * Row-level variables: now can visualize 4 dimensions
 
