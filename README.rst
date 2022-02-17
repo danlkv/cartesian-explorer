@@ -17,6 +17,12 @@ Cartesian Explorer
 
 A handy tool to map functions over their domains.
 
+Cartesian explorer has following layers:
+
+- an extension over matplotlib, such that you can plot multi-dimensional data.
+- ability to define a “computational graph” in terms of variables. Basically, If you set a function def foo(bar), and do not provide a value for bar then caex will look for another function called “bar” to get the value for it from other provided variables.
+- finally, there is a handy utility to parallelize all the calculations.
+
 
 .. image:: docs/Screenshot%20from%202021-03-05%2022-05-32.png
 
