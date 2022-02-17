@@ -6,6 +6,7 @@ from multiprocessing import Pool
 from multiprocessing.dummy import Pool as ThreadPool
 from functools import reduce
 import itertools
+from cartesian_explorer.plot_functions import with_std
 
 from tqdm.auto import tqdm
 
@@ -16,27 +17,7 @@ from cartesian_explorer import parallels
 
 from typing import Dict
 
-CAEX_PLOT_KWG = ['band_alpha']
 
-def _plot_with_band(x, line_data, **plot_kwargs):
-    line_data = line_data.astype(np.float64)
-    #maximums = np.nanmax(line_data, axis=-1)
-    #minimums = np.nanmin(line_data, axis=-1)
-
-    std = np.nanstd(line_data, axis=-1)
-    mean = np.nanmean(line_data, axis=-1)
-    # --
-    # call the plotting function
-    fill_kwargs = dict(
-        alpha=plot_kwargs.get('band_alpha', 0.05), color=plot_kwargs.get('color')
-    )
-    [plot_kwargs.pop(x, None) for x in CAEX_PLOT_KWG]
-    plt.plot(x, mean, **plot_kwargs)
-    #plt.fill_between(x, minimums, maximums, **fill_kwargs)
-    #plot_func(x, minimums, alpha=0.3, **line_local_plot_kwargs)
-    #plot_func(x, maximums, alpha=0.3, **line_local_plot_kwargs)
-    #plt.fill_between(x, mean-2*std, mean+2*std, **fill_kwargs)
-    plt.fill_between(x, mean-std, mean+std, **fill_kwargs)
 
 def apply_func(x):
     func, kwargs = x
@@ -127,7 +108,7 @@ class ExplorerBasic:
             data = data.reshape(nrows*ncols, -1)
         else:
             ax_titles = [None]
-            f = plt.figure(dpi=100)
+            f = plt.figure(dpi=self.dpi)
             axs = [plt.gca()]
             data = data[np.newaxis, :]
         # --
@@ -268,7 +249,7 @@ class ExplorerBasic:
         # print('selected iterargs', var_specs)
         return dict(var_specs), uservars_corrected
 
-    def plot(self, func, plot_func=_plot_with_band, plot_kwargs=dict(), processes=1,
+    def plot(self, func, plot_func=with_std, plot_kwargs=dict(), processes=1,
              distribution_var=tuple(),
              **uservars
             ):
@@ -309,16 +290,19 @@ class ExplorerBasic:
                     # B: Use value format
                     plot_kwargs['label'] = f"{str(lineval)}"
 
-                    # ---- Set line color
-                    _default_cmap = mpl.cm.get_cmap('gnuplot2')
-                    _cmap = plot_kwargs.get('cmap', _default_cmap)
+                # ---- Set line color
+                _default_cmap = mpl.cm.get_cmap('gnuplot2')
+                _cmap = plot_kwargs.get('cmap', _default_cmap)
+                if lineval is not None:
                     _c_value = i/(len(lines) - 1)
-                    # Do not include edges
-                    _edge_shift = .24
-                    _c_value = _c_value*(1 - 2*_edge_shift) + _edge_shift
-                    _default_color = _cmap(_c_value)
-                    line_local_plot_kwargs['color'] = _default_color
-                    # ---- 
+                else:
+                    _c_value = 0
+                # Do not include edges
+                _edge_shift = .24
+                _c_value = _c_value*(1 - 2*_edge_shift) + _edge_shift
+                _default_color = _cmap(_c_value)
+                line_local_plot_kwargs['color'] = _default_color
+                # ---- 
 
             # --
                 if plot_kwargs.get('grid', True):

@@ -65,6 +65,9 @@ Cache
 TODO
 ----
 
+- [ ] ``with caex.no_cache():...`` to disable cache. Or a keyword argument
+- [ ] If an optional argument is provided by some provider that depends on other variable, call it in case the latter variable is provided
+- [ ] If distribution var is 1-d then it's not used, but the latest dimension is used as distribution var
 - [ ] Interpolation, extrapolation
 - [ ] Vectorized providers
 - [x] Plot distribution props along additional distribution var

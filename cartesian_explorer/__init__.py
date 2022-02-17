@@ -1,7 +1,13 @@
 __version__ = '0.1.12'
+
+# the arguments that are used by plotting in cartesian_explorer,
+# which are removed and not passed to mpl
+CAEX_PLOT_KWG = ['band_alpha']
+
 import logging
 mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.WARNING)
+
 
 from cartesian_explorer import lazy_imports
 

@@ -1,0 +1,17 @@
+digraph {
+	graph [size="12,12"]
+	node [align=left fontsize=12 height=0.2 ranksep=0.1 shape=box style=filled]
+	139686017294128 [label=N fillcolor=lightblue]
+	139685066970160 [label="graph" fillcolor=lightblue]
+	139684799545200 [label=qiskit_time fillcolor=lightblue]
+	139686017162544 [label=p fillcolor=lightblue]
+	139684799545136 [label=quimb_time fillcolor=lightblue]
+	139684799590512 [label=qtensor_time fillcolor=lightblue]
+	"graph" -> N [label="graph"]
+	qiskit_time -> "graph" [label=qiskit_time]
+	quimb_time -> "graph" [label=quimb_time]
+	qtensor_time -> "graph" [label=qtensor_time]
+	qiskit_time -> p [label=qiskit_time]
+	quimb_time -> p [label=quimb_time]
+	qtensor_time -> p [label=qtensor_time]
+}
