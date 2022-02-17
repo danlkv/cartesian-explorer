@@ -95,7 +95,7 @@ class ExplorerBasic:
                 rows = iterargs[plot_row_var_key]
                 row_titles = [plot_row_var_key+'='+x for x in rows]
                 ax_titles = itertools.product(row_titles, ax_titles)
-                ax_titles = [' '.join(x) for x in ax_titles]
+                ax_titles = [' '.join([str(xx) for xx in x]) for x in ax_titles]
                 nrows = len(rows)
             else:
                 nrows = 1

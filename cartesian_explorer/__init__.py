@@ -1,4 +1,4 @@
-__version__ = '0.1.12'
+__version__ = '0.1.13'
 
 # the arguments that are used by plotting in cartesian_explorer,
 # which are removed and not passed to mpl
