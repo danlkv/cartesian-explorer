@@ -1,26 +1,10 @@
 from cartesian_explorer.lib import lru_cache as cache1
 from cartesian_explorer.lib import lru_cache_mproc as cache2
 from cartesian_explorer.lib import lru_cache_diskcache as cache_disk
+from .cacheIFC import CacheIFC
+from .directory_csv import DirectoryCSVCache
 
 import joblib
-
-class CacheIFC:
-    def __call__(self, func, **kwargs):
-        cached = self.wrap(func, **kwargs)
-        cached._original = func
-        return cached
-
-    def wrap(self, func, **kwargs) -> callable:
-        raise NotImplementedError
-
-    def call(func, *args, **kwargs):
-        raise NotImplementedError
-
-    def lookup(self, func, *args, **kwargs):
-        raise NotImplementedError
-
-    def clear(self, func):
-        raise NotImplementedError
 
 
 class FunctoolsCache(CacheIFC):
