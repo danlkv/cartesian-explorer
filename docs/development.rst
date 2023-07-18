@@ -33,3 +33,31 @@ Development
    .. code-block:: bash
 
        cd docs && make html
+
+
+Documentation
+-------------
+
+Tips and tricks
+~~~~~~~~~~~~~~~
+
+1. If a list item has long text or a block of code, you have to ensure that the indent is 
+   exactly the same as the first line of the item.
+    
+   .. code-block:: rst
+
+      1. List item 
+         next line of the item
+
+         .. code-block:: python
+
+             print('hello')
+
+2. If you want to add a HTTPS link, use this syntax:
+   
+   .. code-block:: rst
+
+       `link text <https://link-url.org>`_
+
+3. Hide jupyter notebook code cells from the documentation when using `nbsphinx <https://nbsphinx.readthedocs.io/en/typlog-theme/hidden-cells.html>`_:
+
