@@ -2,8 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-from multiprocessing import Pool
-from multiprocessing.dummy import Pool as ThreadPool
+from collections.abc import Iterable
 from functools import reduce
 import itertools
 from cartesian_explorer.plot_functions import with_std
@@ -12,16 +11,15 @@ from tqdm.auto import tqdm
 
 from cartesian_explorer import caches
 from cartesian_explorer import dict_product
-from cartesian_explorer import parallels
+from cartesian_explorer.parallels import get_parallel
 
 
 from typing import Dict
 
-
-
 def apply_func(x):
     func, kwargs = x
     return func(**kwargs)
+
 def just_lookup(user_func, cache, kwargs):
     in_cache = cache.lookup(user_func, **kwargs)
     if in_cache:
@@ -52,14 +50,7 @@ class ExplorerBasic:
         self.parallel_class = None
         self.parallel = None
         if isinstance(parallel, str):
-            if parallel == 'thread':
-                self.parallel_class = parallels.Thread
-            elif parallel == 'process':
-                self.parallel_class = parallels.Multiprocess
-            elif parallel == 'joblib':
-                self.parallel_class = parallels.JobLib
-            elif parallel == 'ray':
-                self.parallel_class = parallels.Ray
+            parallel = get_parallel(parallel)
         else:
             self.parallel = parallel
         self.dpi = 100
@@ -134,7 +125,7 @@ class ExplorerBasic:
     # ---- Output
 
     def map(self, func, processes=1, out_dim=None, pbar=True,
-            **param_space: Dict[str, iter]):
+            **param_space: Dict[str, Iterable]):
         """ Apply a function cartesian product of parameters.
 
         Args:
@@ -145,7 +136,7 @@ class ExplorerBasic:
                 The vector dimension will become last dimension of the result.
             pbar (bool): whether to use the progress bar
 
-            **kwargs (dict[str, iter]):
+            **kwargs (dict[str, Iterable]):
                 each keyword argument should be an iterable.
                 the order of the arguments will be preserved in the output shape.
 
@@ -204,7 +195,7 @@ class ExplorerBasic:
         return result
 
     def map_no_call(self, func, processes=1, out_dim=None,
-                    **param_space: Dict[str, iter]):
+                    **param_space: Dict[str, Iterable]):
         """ Get cached values of function over cartesian product of parameters.
 
         API is same as :meth:`cartesian_explorer.ExplorerBasic.map`

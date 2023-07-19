@@ -20,6 +20,8 @@ dependencies = [
     "Click>=7.0",
     "tqdm",
     "numpy",
+    "xarray",
+    "pandas",
     "matplotlib",
     "networkx",
     "joblib",
