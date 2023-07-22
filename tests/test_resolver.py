@@ -98,6 +98,8 @@ def test_resolve_call():
 
     people = explorer.map_variable('person', name=['Martin', 'John'])
     assert len(people) == 2
+    assert people.shape == (2,)
+    assert type(people[0]) == Person
     assert people[0].name == 'Martin'
     assert people[0].age == 15
 

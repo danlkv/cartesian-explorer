@@ -124,8 +124,8 @@ class ExplorerBasic:
 
     # ---- Output
 
-    def map(self, func, processes=1, out_dim=None, pbar=True,
-            **param_space: Dict[str, Iterable]):
+    def map(self, func, processes=1, out_dim=None, pbar=False,
+            **param_space: Iterable):
         """ Apply a function cartesian product of parameters.
 
         Args:
@@ -146,7 +146,11 @@ class ExplorerBasic:
 
         Examples:
 
-            >>> arr = ex.map(lambda x, y: x + y, x=[1, 2, 3], y=[3, 4], pbar=False)
+            Apply add function over all combinations of ``x=[1, 2, 3]`` and ``y=[4, 5]``.
+
+            >>> ex = ExplorerBasic()
+            >>> add_fn = lambda x, y: x + y
+            >>> arr = ex.map(add_fn, x=[1, 2, 3], y=[3, 4])
             >>> arr.shape
             (3, 2)
             >>> arr
@@ -154,19 +158,51 @@ class ExplorerBasic:
                    [5, 6],
                    [6, 7]])
 
-            >>> ex.map(lambda x, y: (x, y), x=[1,3,'h'], y=[(12,0)], pbar=False)
-            ValueError: Cannot reshape array of size 6 into sape (3,)
+            Changing the order of input arguments transposes the output:
 
-            >>> ex.map(lambda x, y: (x, y), out_dim=2, x=[1,3,'h'], y=[12], pbar=False)
-            array([['1', '3', 'h'],
-                   ['12', '12', '12']], dtype='<U21')
+            >>> arr_T = ex.map(add_fn, y=[3, 4], x=[1, 2, 3])
+            >>> arr_T.shape
+            (2, 3)
+            >>> assert np.allclose(arr_T.T, arr)
+
+            Custom python objects are also supported using :py:class:`numpy.object_` dtype:
+
+            >>> a_tuple = ex.map(lambda x, y: (x, y), x=[1,3,'h'], y=[12])
+            >>> a_tuple.shape
+            (3, 1)
+            >>> a_tuple[0,0]
+            (1, 12)
+            >>> assert type(a_tuple.squeeze()[0]) == tuple
+
+            More examples with tricky datatypes
+
+            >>> ex.map(lambda x, y: (x, y), x=[1,3,'h'], y=[(12,0)])
+            array([[(1, (12, 0))],
+                   [(3, (12, 0))],
+                   [('h', (12, 0))]], dtype=object)
+
+            Convert sequence-like output to numpy array:
+
+            >>> a_vec = np.array(a_tuple.tolist())
+            >>> a_vec.shape
+            (3, 1, 2)
+            >>> np.array(a_tuple.tolist()).squeeze()
+            array([['1', '12'],
+                   ['3', '12'],
+                   ['h', '12']], dtype='<U21')
+
+            Shorthand for ``np.array(a_tuple.tolist())``
+
+            >>> a_dim = ex.map(lambda x, y: (x, y), out_dim=2, x=[1,3,'h'], y=[12])
+            >>> a_dim.shape
+            (3, 1, 2)
+            >>> assert (a_vec == a_dim).all()
 
         """
 
         # Uses apply_func
         param_iter = dict_product(**param_space)
         result_shape = tuple(len(x) for x in param_space.values())
-        result_shape = tuple(x for x in result_shape if x > 1)
 
         total_len = reduce(np.multiply, result_shape, 1)
         if (processes > 1 and self.parallel_class is not None) or self.parallel:
@@ -183,19 +219,21 @@ class ExplorerBasic:
 
         # -- Convert to output array. If the element is something vector-ish,
         # use np.object dtype
-        #print('result', result_lin, result_shape)
         if out_dim:
-            result_shape = out_dim, *result_shape
-            result_lin = np.swapaxes(result_lin, 0, -1)
+            result_shape = *result_shape, out_dim
+            result_lin = np.array(result_lin)
         try:
+            # Try to convert result directly, which works ok if the array is consistent
             result = np.array(result_lin).reshape(result_shape)
-        except (TypeError, ValueError) :
-            result = np.array(result_lin, dtype=object).reshape(result_shape)
+        except ValueError:
+            result = np.ndarray(len(result_lin), dtype=object)
+            result[:] = result_lin
+            result = result.reshape(result_shape)
         # --
         return result
 
-    def map_no_call(self, func, processes=1, out_dim=None,
-                    **param_space: Dict[str, Iterable]):
+    def get(self, func, processes=1, out_dim=None,
+                    **param_space: Iterable):
         """ Get cached values of function over cartesian product of parameters.
 
         API is same as :meth:`cartesian_explorer.ExplorerBasic.map`
@@ -204,7 +242,7 @@ class ExplorerBasic:
         param_iter = dict_product(**param_space)
         return self.map(just_lookup, processes=processes, out_dim=out_dim,
                         user_func=[func], cache=[self.cache], kwargs=list(param_iter)
-                       )
+                       )[0, 0]
 
     # ---- Plotting
 
@@ -282,7 +320,7 @@ class ExplorerBasic:
                     plot_kwargs['label'] = f"{str(lineval)}"
 
                 # ---- Set line color
-                _default_cmap = mpl.cm.get_cmap('gnuplot2')
+                _default_cmap = mpl.cm.gnuplot2
                 _cmap = plot_kwargs.get('cmap', _default_cmap)
                 if lineval is not None:
                     _c_value = i/(len(lines) - 1)
@@ -350,7 +388,7 @@ class ExplorerBasic:
                     plot_kwargs['label'] = f"{str(lineval)}"
 
                     # ---- Set line color
-                    _default_cmap = mpl.cm.get_cmap('gnuplot2')
+                    _default_cmap = mpl.cm.gnuplot2
                     _cmap = plot_kwargs.get('cmap', _default_cmap)
                     _c_value = i/(len(lines) - 1)
                     # Do not include edges

@@ -268,7 +268,10 @@ class Explorer(ExplorerBasic):
     #------ Mappers
 
     def map_variables(self, varnames, **kwargs):
-        return self.map(self.get_variables, varnames=[varnames], out_dim=len(varnames), **kwargs)
+        out_dim = len(varnames)
+        res = self.map(self.get_variables, varnames=[varnames],
+                        out_dim=out_dim, **kwargs)[0]
+        return np.moveaxis(res, -1, 0)
 
     def map_variables_no_call(self, varnames, **kwargs):
         return self.map(self.get_variables_no_call, varnames=[varnames], out_dim=len(varnames), **kwargs)
@@ -291,15 +294,13 @@ class Explorer(ExplorerBasic):
             data = self.map_variable(varnames, **kwargs)
             outdim = 0
         else:
-            data = self.map_variables(varnames, **kwargs)
             outdim = len(varnames)
+            data = self.map_variables(varnames, **kwargs)
 
-        _dimcount = len(data.shape)
-        print('_dimcount', _dimcount)
         _dimnames = list(kwargs.keys())
         dimvals = {k:kwargs[k] for k in _dimnames if len(kwargs[k]) > 1}
         if outdim:
-            dimvals = {**{'varname': list(varnames)}, **dimvals}
+            dimvals = {**{'varname': list(varnames)}, **dimvals, }
         return lazy_imports.xarray.DataArray(
             data, dims=list(dimvals.keys()), coords=dimvals
         )
@@ -361,6 +362,7 @@ class Explorer(ExplorerBasic):
 
         Example:
 
+            >>> ex = Explorer()
             >>> ex.plot_variables(('var1', 'var2'), attr1=[1,2])
             >>> ex.plot_variables(varname=('var1', 'var2'), attr1=[1,2])
             >>> ex.plot_variables(attr1=[1,2], varname=('var1', 'var2'))

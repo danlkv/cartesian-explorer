@@ -26,7 +26,7 @@ def test_plot2d():
     maybe_show_plots()
 
 def my_function2d(re, im):
-    return np.sin((re +1j*im)/10)
+    return np.sin((re +1j*im)/10).real
 
 def test_plot3d():
     explorer = Explorer()
