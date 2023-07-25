@@ -16,6 +16,7 @@ Example usage: :doc:`Example usage`
    Example usage
    modules
    development
+   mapping/Mapping_tutorial
 
 
 

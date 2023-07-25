@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
+from cartesian_explorer.lazy_imports import xarray
 from collections.abc import Iterable
 from functools import reduce
 import itertools
@@ -10,7 +11,7 @@ from cartesian_explorer.plot_functions import with_std
 from tqdm.auto import tqdm
 
 from cartesian_explorer import caches
-from cartesian_explorer import dict_product
+from cartesian_explorer import dict_product, index_newdim
 from cartesian_explorer.parallels import get_parallel
 
 
@@ -124,7 +125,28 @@ class ExplorerBasic:
 
     # ---- Output
 
-    def map(self, func, processes=1, out_dim=None, pbar=False,
+    def _param_space_from_map_args(self,
+            constants: dict,
+            variables: dict,
+            **param_space
+    ):
+        if len(variables) > 0:
+            if len(param_space) > 0:
+                raise ValueError((
+                    f"You are using `variables` keyword argument and provided keyword arguments {list(param_space.keys())},"
+                     " which are treated as variables. You should not use both methods"
+                ))
+            param_space = variables
+        if not isinstance(constants, dict):
+            raise ValueError("Constants is a reserved keyword argument, which should be a dictionary.")
+        return param_space
+
+    def map(self, func,
+            processes=1,
+            out_dim=None,
+            pbar=False,
+            constants=dict(),
+            variables=dict(),
             **param_space: Iterable):
         """ Apply a function cartesian product of parameters.
 
@@ -134,6 +156,7 @@ class ExplorerBasic:
             out_dim (int): if the function returns a vector,
                 specify the dimension for proper output shape.
                 The vector dimension will become last dimension of the result.
+            constants (dict): specify additional arguments to the function
             pbar (bool): whether to use the progress bar
 
             **kwargs (dict[str, Iterable]):
@@ -201,7 +224,11 @@ class ExplorerBasic:
         """
 
         # Uses apply_func
+        param_space = self._param_space_from_map_args(
+            constants, variables, **param_space
+        )
         param_iter = dict_product(**param_space)
+        param_iter = index_newdim(param_iter, **constants)
         result_shape = tuple(len(x) for x in param_space.values())
 
         total_len = reduce(np.multiply, result_shape, 1)
@@ -231,6 +258,23 @@ class ExplorerBasic:
             result = result.reshape(result_shape)
         # --
         return result
+    
+    def map_xarray(self, *args, variables=dict(), constants=dict(), **kwargs):
+        """
+        A version of :meth:`ExplorerBasic.map` that returns :py:class:`xarray.DataArray`.
+
+        May raise an error if `xarray` is not installed.
+        """
+        param_space = param_space = self._param_space_from_map_args(
+            constants, variables, **kwargs
+        )
+        data = self.map(*args, variables=variables, constants=constants, **kwargs)
+        coords = param_space
+        for c in constants:
+            if c not in coords:
+                coords[c] = [constants[c]]
+                data = data[..., np.newaxis]
+        return xarray.DataArray(data, dims=list(param_space.keys()), coords=coords).sel(**constants)
 
     def get(self, func, processes=1, out_dim=None,
                     **param_space: Iterable):
