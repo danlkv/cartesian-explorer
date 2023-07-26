@@ -1,0 +1,47 @@
+[project]
+name = "cartesian_explorer"
+version = "0.1.13"
+description = "Utility to efficiently explore functions on their domains"
+requires-python = ">=3.6"
+license = { file = "LICENSE" }
+readme = "README.rst"
+keywords = ["cartesian_explorer"]
+authors = [
+    { name = "Danylo Lykov", email = "lkv97dn@gmail.com" }
+]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "Click>=7.0",
+    "tqdm",
+    "numpy",
+    "xarray",
+    "pandas",
+    "matplotlib",
+    "networkx",
+    "joblib",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "sphinx>=3",
+    "nbsphinx",
+    "sphinx-book-theme",
+    "nbsphinx-link",
+    "pandoc",
+    "ipython",
+    "pyright",
+]
+
+[project.scripts]
+cartesian_explorer = "cartesian_explorer.__main__:main"
+
+[project.urls]
+homepage = "https://github.com/danlkv/cartesian-explorer"

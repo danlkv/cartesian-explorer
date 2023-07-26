@@ -56,7 +56,7 @@ def test_mproc_cache(tmpdir):
     dur = time.time() - start
     assert dur < 6*DELAY
 
-    data_no_call = explorer.map_no_call(func, x=range(3, 10))
+    data_no_call = explorer.get(func, x=range(3, 10))
     print(data, data_no_call)
     assert data_no_call[-1] is None
     assert data_no_call[-2] is None

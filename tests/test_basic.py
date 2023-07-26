@@ -14,18 +14,16 @@ def test_caches():
 
 def test_maps():
     explorer = Explorer()
-    def my_function(x):
+    def my_function1(x):
         return x+1
-    data = explorer.map(my_function, x=range(5))
-    print(data)
+    data = explorer.map(my_function1, x=range(5))
     assert np.allclose(data, np.arange(1,6))
 
-    def my_function(x, y):
+    def my_function2(x, y):
         return x+y
-    data = explorer.map(my_function, x=range(5), y=range(3))
-    print(data)
+    data = explorer.map(my_function2, x=range(5), y=range(3))
     assert data.shape == (5, 3)
-    assert data[1, 2] == my_function(1, 2)
+    assert data[1, 2] == my_function2(1, 2)
     assert data[4, 2] == 4+2
 
 def my_function(x):
@@ -42,7 +40,7 @@ def test_map_no_call():
     explorer = Explorer(parallel='thread')
     cached = explorer.cache_function(my_function)
     data = explorer.map(cached, processes=2, x=range(5))
-    data_no_call = explorer.map_no_call(cached, x=range(2, 9))
+    data_no_call = explorer.get(cached, x=range(2, 9))
     print(data, data_no_call)
     assert data_no_call[-1] is None
     assert data_no_call[-2] is None

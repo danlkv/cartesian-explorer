@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-from multiprocessing import Pool
-from multiprocessing.dummy import Pool as ThreadPool
+from cartesian_explorer.lazy_imports import xarray
+from collections.abc import Iterable
 from functools import reduce
 import itertools
 from cartesian_explorer.plot_functions import with_std
@@ -11,17 +11,16 @@ from cartesian_explorer.plot_functions import with_std
 from tqdm.auto import tqdm
 
 from cartesian_explorer import caches
-from cartesian_explorer import dict_product
-from cartesian_explorer import parallels
+from cartesian_explorer import dict_product, index_newdim
+from cartesian_explorer.parallels import get_parallel
 
 
 from typing import Dict
 
-
-
 def apply_func(x):
     func, kwargs = x
     return func(**kwargs)
+
 def just_lookup(user_func, cache, kwargs):
     in_cache = cache.lookup(user_func, **kwargs)
     if in_cache:
@@ -52,14 +51,7 @@ class ExplorerBasic:
         self.parallel_class = None
         self.parallel = None
         if isinstance(parallel, str):
-            if parallel == 'thread':
-                self.parallel_class = parallels.Thread
-            elif parallel == 'process':
-                self.parallel_class = parallels.Multiprocess
-            elif parallel == 'joblib':
-                self.parallel_class = parallels.JobLib
-            elif parallel == 'ray':
-                self.parallel_class = parallels.Ray
+            parallel = get_parallel(parallel)
         else:
             self.parallel = parallel
         self.dpi = 100
@@ -133,8 +125,29 @@ class ExplorerBasic:
 
     # ---- Output
 
-    def map(self, func, processes=1, out_dim=None, pbar=True,
-            **param_space: Dict[str, iter]):
+    def _param_space_from_map_args(self,
+            constants: dict,
+            variables: dict,
+            **param_space
+    ):
+        if len(variables) > 0:
+            if len(param_space) > 0:
+                raise ValueError((
+                    f"You are using `variables` keyword argument and provided keyword arguments {list(param_space.keys())},"
+                     " which are treated as variables. You should not use both methods"
+                ))
+            param_space = variables
+        if not isinstance(constants, dict):
+            raise ValueError("Constants is a reserved keyword argument, which should be a dictionary.")
+        return param_space
+
+    def map(self, func,
+            processes=1,
+            out_dim=None,
+            pbar=False,
+            constants=dict(),
+            variables=dict(),
+            **param_space: Iterable):
         """ Apply a function cartesian product of parameters.
 
         Args:
@@ -143,9 +156,10 @@ class ExplorerBasic:
             out_dim (int): if the function returns a vector,
                 specify the dimension for proper output shape.
                 The vector dimension will become last dimension of the result.
+            constants (dict): specify additional arguments to the function
             pbar (bool): whether to use the progress bar
 
-            **kwargs (dict[str, iter]):
+            **kwargs (dict[str, Iterable]):
                 each keyword argument should be an iterable.
                 the order of the arguments will be preserved in the output shape.
 
@@ -155,7 +169,11 @@ class ExplorerBasic:
 
         Examples:
 
-            >>> arr = ex.map(lambda x, y: x + y, x=[1, 2, 3], y=[3, 4], pbar=False)
+            Apply add function over all combinations of ``x=[1, 2, 3]`` and ``y=[4, 5]``.
+
+            >>> ex = ExplorerBasic()
+            >>> add_fn = lambda x, y: x + y
+            >>> arr = ex.map(add_fn, x=[1, 2, 3], y=[3, 4])
             >>> arr.shape
             (3, 2)
             >>> arr
@@ -163,19 +181,55 @@ class ExplorerBasic:
                    [5, 6],
                    [6, 7]])
 
-            >>> ex.map(lambda x, y: (x, y), x=[1,3,'h'], y=[(12,0)], pbar=False)
-            ValueError: Cannot reshape array of size 6 into sape (3,)
+            Changing the order of input arguments transposes the output:
 
-            >>> ex.map(lambda x, y: (x, y), out_dim=2, x=[1,3,'h'], y=[12], pbar=False)
-            array([['1', '3', 'h'],
-                   ['12', '12', '12']], dtype='<U21')
+            >>> arr_T = ex.map(add_fn, y=[3, 4], x=[1, 2, 3])
+            >>> arr_T.shape
+            (2, 3)
+            >>> assert np.allclose(arr_T.T, arr)
+
+            Custom python objects are also supported using :py:class:`numpy.object_` dtype:
+
+            >>> a_tuple = ex.map(lambda x, y: (x, y), x=[1,3,'h'], y=[12])
+            >>> a_tuple.shape
+            (3, 1)
+            >>> a_tuple[0,0]
+            (1, 12)
+            >>> assert type(a_tuple.squeeze()[0]) == tuple
+
+            More examples with tricky datatypes
+
+            >>> ex.map(lambda x, y: (x, y), x=[1,3,'h'], y=[(12,0)])
+            array([[(1, (12, 0))],
+                   [(3, (12, 0))],
+                   [('h', (12, 0))]], dtype=object)
+
+            Convert sequence-like output to numpy array:
+
+            >>> a_vec = np.array(a_tuple.tolist())
+            >>> a_vec.shape
+            (3, 1, 2)
+            >>> np.array(a_tuple.tolist()).squeeze()
+            array([['1', '12'],
+                   ['3', '12'],
+                   ['h', '12']], dtype='<U21')
+
+            Shorthand for ``np.array(a_tuple.tolist())``
+
+            >>> a_dim = ex.map(lambda x, y: (x, y), out_dim=2, x=[1,3,'h'], y=[12])
+            >>> a_dim.shape
+            (3, 1, 2)
+            >>> assert (a_vec == a_dim).all()
 
         """
 
         # Uses apply_func
+        param_space = self._param_space_from_map_args(
+            constants, variables, **param_space
+        )
         param_iter = dict_product(**param_space)
+        param_iter = index_newdim(param_iter, **constants)
         result_shape = tuple(len(x) for x in param_space.values())
-        result_shape = tuple(x for x in result_shape if x > 1)
 
         total_len = reduce(np.multiply, result_shape, 1)
         if (processes > 1 and self.parallel_class is not None) or self.parallel:
@@ -192,19 +246,43 @@ class ExplorerBasic:
 
         # -- Convert to output array. If the element is something vector-ish,
         # use np.object dtype
-        #print('result', result_lin, result_shape)
         if out_dim:
-            result_shape = out_dim, *result_shape
-            result_lin = np.swapaxes(result_lin, 0, -1)
+            result_shape = *result_shape, out_dim
+            result_lin = np.array(result_lin)
         try:
+            # Try to convert result directly, which works ok if the array is consistent
             result = np.array(result_lin).reshape(result_shape)
-        except (TypeError, ValueError) :
-            result = np.array(result_lin, dtype=object).reshape(result_shape)
+        except ValueError:
+            result = np.ndarray(len(result_lin), dtype=object)
+            result[:] = result_lin
+            result = result.reshape(result_shape)
         # --
         return result
+    
+    def map_xarray(self, *args, variables=dict(), constants=dict(), **kwargs):
+        """
+        A version of :meth:`ExplorerBasic.map` that returns :py:class:`xarray.DataArray`.
 
-    def map_no_call(self, func, processes=1, out_dim=None,
-                    **param_space: Dict[str, iter]):
+        May raise an error if `xarray` is not installed.
+        """
+        param_space = param_space = self._param_space_from_map_args(
+            constants, variables, **kwargs
+        )
+        data = self.map(*args, variables=variables, constants=constants, **kwargs)
+        coords = list(param_space.items())
+        for c in constants:
+            if c not in param_space:
+                # This way of creating array is intentional. The goal is to
+                # ensure xarray treats the object as-is, not as dimension definition
+                cd = np.empty(1, dtype='object')
+                cd[0] = constants[c]
+                coords.append((c, cd))
+                data = data[..., np.newaxis]
+        dims = [d for d, _ in coords]
+        return xarray.DataArray(data, dims=dims, coords=coords).sel(**constants)
+
+    def get(self, func, processes=1, out_dim=None,
+                    **param_space: Iterable):
         """ Get cached values of function over cartesian product of parameters.
 
         API is same as :meth:`cartesian_explorer.ExplorerBasic.map`
@@ -213,7 +291,7 @@ class ExplorerBasic:
         param_iter = dict_product(**param_space)
         return self.map(just_lookup, processes=processes, out_dim=out_dim,
                         user_func=[func], cache=[self.cache], kwargs=list(param_iter)
-                       )
+                       )[0, 0]
 
     # ---- Plotting
 
@@ -291,7 +369,7 @@ class ExplorerBasic:
                     plot_kwargs['label'] = f"{str(lineval)}"
 
                 # ---- Set line color
-                _default_cmap = mpl.cm.get_cmap('gnuplot2')
+                _default_cmap = mpl.cm.gnuplot2
                 _cmap = plot_kwargs.get('cmap', _default_cmap)
                 if lineval is not None:
                     _c_value = i/(len(lines) - 1)
@@ -359,7 +437,7 @@ class ExplorerBasic:
                     plot_kwargs['label'] = f"{str(lineval)}"
 
                     # ---- Set line color
-                    _default_cmap = mpl.cm.get_cmap('gnuplot2')
+                    _default_cmap = mpl.cm.gnuplot2
                     _cmap = plot_kwargs.get('cmap', _default_cmap)
                     _c_value = i/(len(lines) - 1)
                     # Do not include edges

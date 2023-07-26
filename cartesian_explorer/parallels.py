@@ -1,9 +1,13 @@
+from __future__ import annotations
 import multiprocessing as mproc
 import logging
 import multiprocessing.dummy as thrd
 import joblib
 from itertools import repeat
 import importlib
+
+# -- Lazy imports
+
 class LazyModule:
     def __init__(self, module_name):
         self.module = None
@@ -15,6 +19,22 @@ class LazyModule:
         return self.module.__getattribute__(prop)
 
 ray = LazyModule('ray')
+# --
+
+def get_available_parallel():
+    subclasses = ParallelIFC.__subclasses__()
+    return [cls.string_label for cls in subclasses]
+
+def get_parallel(parallel: str | None, processes: int | None = None):
+    subclasses = ParallelIFC.__subclasses__()
+    if parallel is None:
+        parallel = 'process'
+    
+    for cls in subclasses:
+        if cls.string_label == parallel:
+            return cls(processes=processes)
+    raise ValueError(f'Unknown parallel {parallel}. Available: {get_available_parallel()}')
+
 
 def apply_kwargs(pair):
     func, kwargs = pair
@@ -25,7 +45,10 @@ def apply_args(pair):
     return func(*args)
 
 class ParallelIFC:
-    def __init__(self, processes=2):
+    processes: int | None
+    string_label: str
+
+    def __init__(self, processes: int | None = None):
         self.processes = processes
 
     def map(self, func, args):
@@ -38,16 +61,19 @@ class ParallelIFC:
         return self.map(apply_kwargs, zip(repeat(func), args))
 
 class Multiprocess(ParallelIFC):
+    string_label = 'process'
     def map(self, func, args):
         with mproc.Pool(processes=self.processes) as pool:
             return pool.map(func, args)
 
 class Thread(ParallelIFC):
+    string_label = 'thread'
     def map(self, func, args):
         with thrd.Pool(processes=self.processes) as pool:
             return pool.map(func, args)
 
 class JobLib(ParallelIFC):
+    string_label = 'joblib'
     def __init__(self, processes=None, *args, **kwargs):
         super().__init__(processes=processes)
         if processes:
@@ -59,6 +85,7 @@ class JobLib(ParallelIFC):
         return r
 
 class Ray(ParallelIFC):
+    string_label = 'ray'
     def __init__(self, processes=None, *args, **kwargs):
         super().__init__(processes=processes)
         kwargs['ignore_reinit_error'] = kwargs.get('ignore_reinit_error', True)

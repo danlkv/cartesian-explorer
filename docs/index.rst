@@ -9,11 +9,14 @@ Welcome to Cartesian explorer's documentation!
 Example usage: :doc:`Example usage`
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Contents:
    :glob:
 
    Example usage
+   modules
+   development
+   mapping/Mapping_tutorial
 
 
 

@@ -1,0 +1,12 @@
+/* 
+* pydata-sphinx-theme.css sets table rule width: fit-content,
+* which makes rendered pandas dataframes have same-width columns,
+* causing awkward space allocations between data and indices
+*/
+.jp-RenderedHTMLCommon table, div.rendered_html table {
+    /* fix column spacing in table */
+    width: auto;
+    /* This is not crucial, but for consistency with jupyter */
+    margin-left: 0;
+    margin-right: 0;
+}

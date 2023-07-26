@@ -18,6 +18,6 @@ def test_add_with_provider():
     zv = explorer.get_variable('z', x=1, m=5)
     assert zv == 1*2+1+5
     zs = explorer.map_variable('z', x=[1, 2, 3], m=[2])
-    print(zs)
-    assert all(zs == [6, 9, 12])
+    assert zs.shape == (3, 1)
+    assert all(zs[:,0] == [6, 9, 12])
 

@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from typing import Union
 
+from collections.abc import Iterable
 from cartesian_explorer.ExplorerBasic import ExplorerBasic
 from functools import update_wrapper
 from cartesian_explorer.lib.lru_cache import lru_cache
@@ -9,7 +10,6 @@ from cartesian_explorer.lib.dep_graph import dep_graph, draw_dependency_graph, d
 from cartesian_explorer.lib.argument_inspect import get_required_argnames, get_optional_argnames
 from cartesian_explorer import lazy_imports
 
-import joblib
 
 RESOLVER_RECURSION_DEPTH = 15
 class RecursionLimit(RuntimeError):
@@ -268,7 +268,10 @@ class Explorer(ExplorerBasic):
     #------ Mappers
 
     def map_variables(self, varnames, **kwargs):
-        return self.map(self.get_variables, varnames=[varnames], out_dim=len(varnames), **kwargs)
+        out_dim = len(varnames)
+        res = self.map(self.get_variables, varnames=[varnames],
+                        out_dim=out_dim, **kwargs)[0]
+        return np.moveaxis(res, -1, 0)
 
     def map_variables_no_call(self, varnames, **kwargs):
         return self.map(self.get_variables_no_call, varnames=[varnames], out_dim=len(varnames), **kwargs)
@@ -291,15 +294,13 @@ class Explorer(ExplorerBasic):
             data = self.map_variable(varnames, **kwargs)
             outdim = 0
         else:
-            data = self.map_variables(varnames, **kwargs)
             outdim = len(varnames)
+            data = self.map_variables(varnames, **kwargs)
 
-        _dimcount = len(data.shape)
-        print('_dimcount', _dimcount)
         _dimnames = list(kwargs.keys())
         dimvals = {k:kwargs[k] for k in _dimnames if len(kwargs[k]) > 1}
         if outdim:
-            dimvals = {**{'varname': list(varnames)}, **dimvals}
+            dimvals = {**{'varname': list(varnames)}, **dimvals, }
         return lazy_imports.xarray.DataArray(
             data, dims=list(dimvals.keys()), coords=dimvals
         )
@@ -361,6 +362,7 @@ class Explorer(ExplorerBasic):
 
         Example:
 
+            >>> ex = Explorer()
             >>> ex.plot_variables(('var1', 'var2'), attr1=[1,2])
             >>> ex.plot_variables(varname=('var1', 'var2'), attr1=[1,2])
             >>> ex.plot_variables(attr1=[1,2], varname=('var1', 'var2'))
@@ -396,21 +398,21 @@ class Explorer(ExplorerBasic):
     def plot_variables2d(self, *args, **kwargs):
         return self.plot_variables(*args, **kwargs)
 
-    def plot_variables3d(self, varnames: Union[str, iter], **kwargs):
+    def plot_variables3d(self, varnames: Union[str, Iterable], **kwargs):
         if isinstance(varnames, str):
             varnames = (varnames, )
         fig = self.plot3d(self.get_variable, varname=varnames, **kwargs)
         return fig
 
     # lots of code duplication, but abstracting this would result in bad readability
-    def plot_variables2d_no_call(self, varnames: Union[str, iter], **kwargs):
+    def plot_variables2d_no_call(self, varnames: Union[str, Iterable], **kwargs):
         if isinstance(varnames, str):
             varnames = [varnames]
         plt.ylabel(varnames[0])
         r = self.plot2d(self.get_variables_no_call, varnames=[varnames], **kwargs)
         return r
 
-    def plot_variables3d_no_call(self, varnames: Union[str, iter], **kwargs):
+    def plot_variables3d_no_call(self, varnames: Union[str, Iterable], **kwargs):
         if isinstance(varnames, str):
             varnames = [varnames]
         r = self.plot3d(self.get_variables_no_call, varnames=[varnames], **kwargs)
