@@ -269,12 +269,17 @@ class ExplorerBasic:
             constants, variables, **kwargs
         )
         data = self.map(*args, variables=variables, constants=constants, **kwargs)
-        coords = param_space
+        coords = list(param_space.items())
         for c in constants:
-            if c not in coords:
-                coords[c] = [constants[c]]
+            if c not in param_space:
+                # This way of creating array is intentional. The goal is to
+                # ensure xarray treats the object as-is, not as dimension definition
+                cd = np.empty(1, dtype='object')
+                cd[0] = constants[c]
+                coords.append((c, cd))
                 data = data[..., np.newaxis]
-        return xarray.DataArray(data, dims=list(param_space.keys()), coords=coords).sel(**constants)
+        dims = [d for d, _ in coords]
+        return xarray.DataArray(data, dims=dims, coords=coords).sel(**constants)
 
     def get(self, func, processes=1, out_dim=None,
                     **param_space: Iterable):
