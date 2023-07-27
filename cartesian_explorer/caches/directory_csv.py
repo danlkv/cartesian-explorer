@@ -4,38 +4,57 @@ from pathlib import Path
 import pandas as pd
 import shutil
 from functools import partial
+from loguru import logger
 
-def serialize_item_pickle(item, cache_file):
+def _save_item(item, cache_file):
     with open(cache_file, 'wb') as f:
         pickle.dump(item, f)
     return cache_file
 
-def serialize_kwargs_pickle(args, kwargs, cache_dir):
-    """
-    Convert
+def _load_item(cache_file):
+    with open(cache_file, 'rb') as f:
+        return pickle.load(f)
 
-        * int, str, float, bool, None -> string
-        * other -> pickle to file in `cache_dir`
-    """
+def _lookup_item(item):
+    return Path(item).exists()
+
+def args_kwargs_merge(args, kwargs):
     kwargs = dict(kwargs)
     for i, arg in enumerate(args):
         kwargs[f'{i}'] = arg
+    return kwargs
 
-    simple_fields = {}
-    complex_fields = {}
+def is_simple_value(v):
+    return isinstance(v, (int, str, float, bool, type(None)))
+
+def args_kwargs_split(kwargs):
+    indexed_args = []
+    new_kwargs = {}
     for k, v in kwargs.items():
-        if isinstance(v, (int, str, float, bool, type(None))):
-            simple_fields[k] = v
+        try:
+            indexed_args.append((int(k), v))
+        except:
+            new_kwargs[k] = v
+    indexed_args.sort(lambda x: x[0])
+    return tuple(v for _, v in indexed_args), new_kwargs
+
+def kwargs_simplify(kwargs):
+    """ Converts items in kwargs to a simple (int, float str, bool) vaule
+    If the value is not simple, uses hash. 
+    Values must be hashable
+    """
+    result = {}
+    for k, v in kwargs.items():
+        if is_simple_value(v):
+            result[k] = v
         else:
-            complex_fields[k] = v
+            result[k] = hash(v)
+    return result
 
-    simple_field_str = [f'{k}_{v}' for k, v in simple_fields.items()]
-    for k, v in complex_fields.items():
-        cache_file = cache_dir / f'{k}__{simple_field_str}.pickle'
-        filename = serialize_item_pickle(v, cache_file)
-        simple_fields[k] = filename
-    return simple_fields
-
+def kwargs_to_filestr(kwargs):
+    """ Converts kwargs to filename-like string """
+    return '_'.join([f'{k}-{v}' for k, v in kwargs.items()])
+        
 
 class DirectoryCSVCache(CacheIFC):
     """
@@ -63,52 +82,64 @@ class DirectoryCSVCache(CacheIFC):
     def wrap(self, func, **kwargs) -> callable:
         path = self._get_path_for_func(func)
         path.mkdir(parents=True, exist_ok=True)
+        self._log(f"Created cache directory at {path}")
         return partial(self.call, func, **kwargs)
+    
+    def _log(self, *args, **kwargs):
+        if self.verbose:
+            logger.info(*args, **kwargs)
 
     def call(self, func, *args, **kwargs):
-        path = self._get_path_for_func(func)
-        index = path / 'index.csv'
-        # Convert function, args and kwargs to lookup row
-        simple_kwargs = simplify_kwargs_pickle(args, kwargs, path)
-        # Check if the function has been called with these args before
+        cache_path = self._get_path_for_func(func)
+        index = cache_path / 'index.csv'
         output_column = self._output_name_fn(func)
-        if self.lookup(func, *args, **kwargs):
-        row = index.exists()
-        if row is not None:
-            result = load_pickle(row[output_column])
+        kwargs_merged = args_kwargs_merge(args, kwargs)
+        kwargs_simplified = kwargs_simplify(kwargs_merged)
+        # Check if the function has been called with these args before
+        row = self._lookup(index, output_column, kwargs_simplified)
+        if not isinstance(row, bool):
+            cachefile = row[output_column]
+            self._log(f"Loading file from {cachefile}")
+            result = _load_item(cachefile)
             return result
-        # If not, call the function
+        else:
+            cachefilename = kwargs_to_filestr(kwargs_simplified) + '.pkl'
+            cachefile = str(cache_path / cachefilename)
+
         result = func(*args, **kwargs)
-        # Save the result to the cache
-        row = simple_kwargs
-        row[output_column] = result
-        row_serialized = serialize_kwargs_pickle(row, path)
+        self._log(f"Saving result to {cachefile}")
+        cachefile_written = _save_item(result, cache_file=cachefile)
+        row_new = kwargs_simplified
+        row_new[output_column] = cachefile_written
         # Add the row to the index
         if not index.exists():
-            index_df = pd.DataFrame(columns=row.keys())
-            # save the index
+            index_df = pd.DataFrame(columns=row_new.keys())
             index_df.to_csv(index, index=False)
         # append to the csv file
-        pd.DataFrame([row_serialized]).to_csv(index, mode='a', header=False, index=False)
+        pd.DataFrame([row_new]).to_csv(index, mode='a', header=False, index=False)
+        self._log(f"Updated index at {index} for {cachefile}")
         return result
-
-    def lookup(self, func, *args, **kwargs):
-        path = self._get_path_for_func(func)
-        index = path / 'index.csv'
-        # TODO: actually check the complex fields
-        converted_kwargs = serialize_kwargs_pickle(args, kwargs, path)
-        if not index.exists():
+    
+    def _lookup(self, indexfile, output_column, kwargs_simplified):
+        if not indexfile.exists():
             return False
-        index_df = pd.read_csv(index, chunksize=500)
+        index_df = pd.read_csv(indexfile, chunksize=500)
         for chunk in index_df:
             for _, row in chunk.iterrows():
                 # check that all kwargs except the output column match
-                output_column = self._output_name_fn(func)
-                if all([row[k] == v for k, v in converted_kwargs.items() if k != output_column]):
+                if all([row[k] == v for k, v in kwargs_simplified.items() if k != output_column]):
                     return row
 
         return False
 
+    def lookup(self, func, *args, **kwargs):
+        cache_path = self._get_path_for_func(func)
+        index = cache_path / 'index.csv'
+        output_column = self._output_name_fn(func)
+        kwargs_merged = args_kwargs_merge(args, kwargs)
+        kwargs_simplified = kwargs_simplify(kwargs_merged)
+        row = self._lookup(index, output_column, kwargs_simplified)
+        return row
 
     def clear(self, func):
         path = self._get_path_for_func(func)
