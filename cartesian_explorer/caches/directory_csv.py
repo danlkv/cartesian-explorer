@@ -5,6 +5,7 @@ import pandas as pd
 import shutil
 from functools import partial
 from loguru import logger
+from cartesian_explorer.lib.argument_inspect import FunctionDefInfo
 
 def _save_item(item, cache_file):
     with open(cache_file, 'wb') as f:
@@ -17,12 +18,6 @@ def _load_item(cache_file):
 
 def _lookup_item(item):
     return Path(item).exists()
-
-def args_kwargs_merge(args, kwargs):
-    kwargs = dict(kwargs)
-    for i, arg in enumerate(args):
-        kwargs[f'{i}'] = arg
-    return kwargs
 
 def is_simple_value(v):
     return isinstance(v, (int, str, float, bool, type(None)))
@@ -38,13 +33,24 @@ def args_kwargs_split(kwargs):
     indexed_args.sort(lambda x: x[0])
     return tuple(v for _, v in indexed_args), new_kwargs
 
-def kwargs_simplify(kwargs):
-    """ Converts items in kwargs to a simple (int, float str, bool) vaule
+def name_arguments(def_info: FunctionDefInfo, args, kwargs) -> dict:
+    if def_info.spec is None:
+        raise ValueError('Function is not supported')
+    arg_names = def_info.spec.args
+    dict_pos = dict(zip(arg_names, args))
+    return {**def_info.kwargs, **dict_pos, **kwargs}
+
+def kwargs_simplify(args, kwargs, func):
+    """ 
+    1. Merges args and kwargs based on arg names.
+    2. Converts values to a simple (int, float str, bool) vaule.
     If the value is not simple, uses hash. 
     Values must be hashable
     """
+    def_info = FunctionDefInfo.from_function(func)
+    kwargs_merged = name_arguments(def_info, args, kwargs)
     result = {}
-    for k, v in kwargs.items():
+    for k, v in kwargs_merged.items():
         if is_simple_value(v):
             result[k] = v
         else:
@@ -83,7 +89,10 @@ class DirectoryCSVCache(CacheIFC):
         path = self._get_path_for_func(func)
         path.mkdir(parents=True, exist_ok=True)
         self._log(f"Created cache directory at {path}")
-        return partial(self.call, func, **kwargs)
+        ret = partial(self.call, func, **kwargs)
+        # ensure compatibility with self.clear
+        ret.__name__ = func.__name__
+        return ret
     
     def _log(self, *args, **kwargs):
         if self.verbose:
@@ -93,8 +102,7 @@ class DirectoryCSVCache(CacheIFC):
         cache_path = self._get_path_for_func(func)
         index = cache_path / 'index.csv'
         output_column = self._output_name_fn(func)
-        kwargs_merged = args_kwargs_merge(args, kwargs)
-        kwargs_simplified = kwargs_simplify(kwargs_merged)
+        kwargs_simplified = kwargs_simplify(args, kwargs, func)
         # Check if the function has been called with these args before
         row = self._lookup(index, output_column, kwargs_simplified)
         if not isinstance(row, bool):
@@ -136,8 +144,7 @@ class DirectoryCSVCache(CacheIFC):
         cache_path = self._get_path_for_func(func)
         index = cache_path / 'index.csv'
         output_column = self._output_name_fn(func)
-        kwargs_merged = args_kwargs_merge(args, kwargs)
-        kwargs_simplified = kwargs_simplify(kwargs_merged)
+        kwargs_simplified = kwargs_simplify(args, kwargs, func)
         row = self._lookup(index, output_column, kwargs_simplified)
         return row
 
@@ -145,3 +152,4 @@ class DirectoryCSVCache(CacheIFC):
         path = self._get_path_for_func(func)
         if path.exists():
             shutil.rmtree(path)
+        path.mkdir(parents=True, exist_ok=True)
