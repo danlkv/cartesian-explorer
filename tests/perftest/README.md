@@ -78,3 +78,7 @@ Environment variables used
 - `measure_time_once`
 - `set_measure_directory`
 - `save_metric`
+
+`compare.py`
+
+- `compare_measures`
